@@ -618,7 +618,7 @@ def admin_user_profile(user_db_id):
             return redirect(url_for("admin_users"))
 
         cases = conn.execute(
-            "SELECT * FROM cases WHERE user_id=? ORDER BY created_at DESC", (user_db_id,)
+            "SELECT * FROM cases WHERE user_id=? ORDER BY created_at ASC", (user_db_id,)
         ).fetchall()
 
         all_docs = conn.execute("""
@@ -668,6 +668,58 @@ def admin_user_profile(user_db_id):
         all_admins=all_admins, assignments=assignments,
         all_docs_by_unique_id=all_docs_by_unique_id,
         all_docs_by_filename=all_docs_by_filename)
+
+
+@app.route("/admin/users/<int:user_db_id>/send", methods=["POST"])
+@login_required
+def admin_send_message(user_db_id):
+    if not can_view_user(user_db_id):
+        return jsonify({"error": "Access denied"}), 403
+
+    text = (request.json or {}).get("text", "").strip()
+    if not text:
+        return jsonify({"error": "Empty message"}), 400
+
+    with get_db() as conn:
+        user = conn.execute("SELECT * FROM users WHERE id=?", (user_db_id,)).fetchone()
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        # Send via Telegram Bot API
+        tg_ok = False
+        if BOT_TOKEN:
+            try:
+                resp = requests.post(
+                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+                    json={"chat_id": user["tg_id"], "text": text, "parse_mode": "HTML"},
+                    timeout=10,
+                )
+                tg_ok = resp.ok
+            except Exception as e:
+                print(f"[TG send] {e}")
+
+        # Save to the most recent case's conversation history
+        case = conn.execute(
+            "SELECT * FROM cases WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_db_id,)
+        ).fetchone()
+
+        ts = datetime.utcnow().isoformat()
+        admin_name = session.get("admin_username", "Admin")
+
+        if case:
+            conv = []
+            try:
+                conv = json.loads(case["conversation_history"] or "[]")
+            except Exception:
+                pass
+            conv.append({"role": "admin", "content": text, "timestamp": ts, "sender": admin_name})
+            conn.execute(
+                "UPDATE cases SET conversation_history=?, updated_at=? WHERE id=?",
+                (json.dumps(conv), ts, case["id"])
+            )
+            conn.commit()
+
+    return jsonify({"ok": True, "tg_sent": tg_ok, "timestamp": ts[:16].replace("T", " "), "sender": admin_name})
 
 
 @app.route("/admin/users/<int:user_db_id>/extract-profile", methods=["POST"])

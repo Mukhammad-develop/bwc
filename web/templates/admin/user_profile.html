@@ -149,97 +149,91 @@
       <button class="tab-btn" onclick="switchTab('tab-files', this)">📎 Files ({{ docs_with_url|length }})</button>
     </div>
 
-    <!-- Chats tab -->
+    <!-- Chats tab — one unified timeline -->
     <div class="tab-pane active" id="tab-chats">
-      {% if cases %}
-        {% for case in cases %}
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header" style="cursor:pointer" onclick="toggleCase({{ case.id }})">
-            <div>
-              <span class="badge badge-{{ case.service }}">
-                {% if case.service=='student' %}🎓 Student
-                {% elif case.service=='paye' %}💷 PAYE
-                {% elif case.service=='self' %}🧾 Self-Emp
-                {% elif case.service=='company' %}🏢 Company
-                {% else %}{{ case.service }}{% endif %}
-              </span>
-              <span style="font-size:.75rem;color:#94a3b8;margin-left:10px">Case #{{ case.id }} · {{ case.created_at[:10] }}</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px">
-              <span class="status-badge status-{{ case.status }}">{{ case.status }}</span>
-              <a href="{{ url_for('admin_case_detail', case_id=case.id) }}" class="btn btn-ghost btn-sm" onclick="event.stopPropagation()">Open →</a>
-              <span style="color:#94a3b8;font-size:.8rem" id="arrow-{{ case.id }}">▼</span>
-            </div>
-          </div>
+      {% set has_any_msg = [] %}
+      {% for case in cases %}{% if case.conversation_history | fromjson %}{% set _ = has_any_msg.append(1) %}{% endif %}{% endfor %}
 
-          <div id="case-{{ case.id }}" style="display:none">
-            {% set conv = case.conversation_history | fromjson %}
-            {% if conv %}
-            <div class="chat-messages" style="max-height:450px;overflow-y:auto;padding:16px;background:#f8fafc;display:flex;flex-direction:column;gap:8px">
-              {% for msg in conv %}
-              {% set parsed = msg.content | parse_file_tag %}
-              <div class="chat-msg {{ msg.role }}">
-                <div class="msg-avatar">{% if msg.role=='user' %}👤{% else %}🤖{% endif %}</div>
-                <div style="max-width:100%">
-                  {% if parsed.is_file %}
-                    {% if parsed.unique_id and parsed.unique_id in all_docs_by_unique_id %}
-                      {% set entry = all_docs_by_unique_id[parsed.unique_id] %}
-                    {% elif parsed.filename and parsed.filename in all_docs_by_filename %}
-                      {% set entry = all_docs_by_filename[parsed.filename] %}
-                    {% else %}
-                      {% set entry = none %}
-                    {% endif %}
-                    <div class="msg-file-bubble">
-                      {% if entry and entry.doc.media_type == 'photo' and entry.url %}
-                        <div class="msg-file-thumb">
-                          <img src="{{ url_for('admin_file_view', file_id=entry.doc.file_id) }}"
-                               alt="{{ parsed.filename }}" loading="lazy">
-                        </div>
-                      {% else %}
-                        <div class="msg-file-icon-wrap">
-                          {% if parsed.filename.lower().endswith('.pdf') %}📄
-                          {% elif parsed.filename.lower().endswith(('.doc','.docx')) %}📝
-                          {% elif parsed.filename.lower().endswith(('.xls','.xlsx')) %}📊
-                          {% elif parsed.filename.lower().endswith(('.jpg','.jpeg','.png','.gif')) %}🖼️
-                          {% else %}📎{% endif %}
-                        </div>
-                      {% endif %}
-                      <div class="msg-file-info">
-                        <div class="msg-file-name">{{ parsed.filename }}</div>
-                        <div class="msg-file-actions">
-                          {% if entry and entry.url %}
-                            <a href="{{ url_for('admin_file_view', file_id=entry.doc.file_id) }}"
-                               target="_blank" class="btn btn-ghost btn-sm">👁️ View</a>
-                            <a href="{{ url_for('admin_file_download', file_id=entry.doc.file_id, name=parsed.filename) }}"
-                               class="btn btn-primary btn-sm">⬇️ Download</a>
-                          {% else %}
-                            <span style="font-size:.7rem;color:#94a3b8">File unavailable (demo)</span>
-                          {% endif %}
-                        </div>
-                      </div>
+      {% if has_any_msg %}
+      <div class="chat-wrap" style="max-height:700px;display:flex;flex-direction:column">
+        <div class="chat-messages" id="unifiedChat" style="flex:1;overflow-y:auto">
+          {% for case in cases %}
+          {% set conv = case.conversation_history | fromjson %}
+          {% if conv %}
+
+          {% for msg in conv %}
+          {% set parsed = msg.content | parse_file_tag %}
+          <div class="chat-msg {{ msg.role }}">
+            <div class="msg-avatar">{% if msg.role=='user' %}👤{% elif msg.role=='admin' %}🛡️{% else %}🤖{% endif %}</div>
+            <div style="max-width:100%">
+              {% if parsed.is_file %}
+                {% if parsed.unique_id and parsed.unique_id in all_docs_by_unique_id %}
+                  {% set entry = all_docs_by_unique_id[parsed.unique_id] %}
+                {% elif parsed.filename and parsed.filename in all_docs_by_filename %}
+                  {% set entry = all_docs_by_filename[parsed.filename] %}
+                {% else %}
+                  {% set entry = none %}
+                {% endif %}
+                <div class="msg-file-bubble">
+                  {% if entry and entry.doc.media_type == 'photo' and entry.url %}
+                    <div class="msg-file-thumb">
+                      <img src="{{ url_for('admin_file_view', file_id=entry.doc.file_id) }}"
+                           alt="{{ parsed.filename }}" loading="lazy">
                     </div>
                   {% else %}
-                    <div class="msg-bubble markdown-body">{{ msg.content }}</div>
+                    <div class="msg-file-icon-wrap">
+                      {% if parsed.filename.lower().endswith('.pdf') %}📄
+                      {% elif parsed.filename.lower().endswith(('.doc','.docx')) %}📝
+                      {% elif parsed.filename.lower().endswith(('.xls','.xlsx')) %}📊
+                      {% elif parsed.filename.lower().endswith(('.jpg','.jpeg','.png','.gif')) %}🖼️
+                      {% else %}📎{% endif %}
+                    </div>
                   {% endif %}
-                  <div class="msg-meta">
-                    {{ msg.role|title }}
-                    {% if msg.timestamp %} · {{ msg.timestamp[:16]|replace('T',' ') }}{% endif %}
+                  <div class="msg-file-info">
+                    <div class="msg-file-name">{{ parsed.filename }}</div>
+                    <div class="msg-file-actions">
+                      {% if entry and entry.url %}
+                        <a href="{{ url_for('admin_file_view', file_id=entry.doc.file_id) }}"
+                           target="_blank" class="btn btn-ghost btn-sm">👁️ View</a>
+                        <a href="{{ url_for('admin_file_download', file_id=entry.doc.file_id, name=parsed.filename) }}"
+                           class="btn btn-primary btn-sm">⬇️ Download</a>
+                      {% else %}
+                        <span style="font-size:.7rem;color:#94a3b8">File unavailable</span>
+                      {% endif %}
+                    </div>
                   </div>
                 </div>
-              </div>
-              {% endfor %}
+              {% else %}
+                <div class="msg-bubble markdown-body">{{ msg.content }}</div>
+              {% endif %}
+                  <div class="msg-meta">
+                    {% if msg.role=='admin' %}🛡️ {{ msg.sender if msg.sender is defined else 'Admin' }}{% else %}{{ msg.role|title }}{% endif %}
+                    {% if msg.timestamp %} · {{ msg.timestamp[:16]|replace('T',' ') }}{% endif %}
+                  </div>
             </div>
-            {% else %}
-            <div style="padding:20px;text-align:center;color:#94a3b8;font-size:.85rem">No messages in this case.</div>
-            {% endif %}
           </div>
+          {% endfor %}
+
+          {% endif %}
+          {% endfor %}
         </div>
-        {% endfor %}
+
+        <!-- Admin reply bar -->
+        <div class="admin-reply-bar">
+          <input type="text" id="adminMsgInput" placeholder="Write a message to this user…" autocomplete="off">
+          <button id="adminSendBtn" onclick="adminSendMessage()">Send ↑</button>
+        </div>
+      </div>
       {% else %}
-        <div class="empty-state">
-          <div class="es-icon">💬</div>
-          <h3>No chat history</h3>
-          <p>This user hasn't started any service consultation yet.</p>
+        <!-- No history yet but still show the reply bar -->
+        <div class="chat-wrap" style="display:flex;flex-direction:column;min-height:120px">
+          <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:20px;color:#94a3b8;font-size:.85rem">
+            No messages yet — send the first one below.
+          </div>
+          <div class="admin-reply-bar">
+            <input type="text" id="adminMsgInput" placeholder="Write a message to this user…" autocomplete="off">
+            <button id="adminSendBtn" onclick="adminSendMessage()">Send ↑</button>
+          </div>
         </div>
       {% endif %}
     </div>
@@ -303,19 +297,63 @@
 
 {% block extra_js %}
 <script>
-function toggleCase(id) {
-  const el = document.getElementById('case-' + id);
-  const arrow = document.getElementById('arrow-' + id);
-  if (el.style.display === 'none') {
-    el.style.display = 'block';
-    arrow.textContent = '▲';
-    // scroll to bottom of chat
-    const chat = el.querySelector('.chat-messages');
-    if (chat) chat.scrollTop = chat.scrollHeight;
-  } else {
-    el.style.display = 'none';
-    arrow.textContent = '▼';
+document.addEventListener('DOMContentLoaded', () => {
+  const chat = document.getElementById('unifiedChat');
+  if (chat) chat.scrollTop = chat.scrollHeight;
+
+  // Send on Enter key
+  const input = document.getElementById('adminMsgInput');
+  if (input) input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); adminSendMessage(); }
+  });
+});
+
+async function adminSendMessage() {
+  const input = document.getElementById('adminMsgInput');
+  const btn   = document.getElementById('adminSendBtn');
+  const text  = (input.value || '').trim();
+  if (!text) return;
+
+  btn.disabled = true;
+  btn.textContent = '…';
+
+  try {
+    const res  = await fetch('{{ url_for("admin_send_message", user_db_id=user.id) }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      input.value = '';
+      // Append bubble to chat immediately
+      const chat = document.getElementById('unifiedChat');
+      if (chat) {
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-msg admin';
+        bubble.innerHTML = `
+          <div style="max-width:100%">
+            <div class="msg-bubble">${escapeHtml(text)}</div>
+            <div class="msg-meta">🛡️ ${data.sender} · ${data.timestamp}${data.tg_sent ? ' · ✓ sent' : ' · ⚠ not delivered'}</div>
+          </div>
+          <div class="msg-avatar">🛡️</div>`;
+        chat.appendChild(bubble);
+        chat.scrollTop = chat.scrollHeight;
+      }
+    } else {
+      alert(data.error || 'Failed to send.');
+    }
+  } catch(e) {
+    alert('Network error — could not send.');
   }
+
+  btn.disabled = false;
+  btn.textContent = 'Send ↑';
+}
+
+function escapeHtml(t) {
+  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 </script>
 {% endblock %}
