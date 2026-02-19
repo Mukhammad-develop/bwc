@@ -1,0 +1,321 @@
+{% extends "admin/base.html" %}
+{% block title %}User @{{ user.tg_id }}{% endblock %}
+{% block page_title %}User Profile — @{{ user.tg_id }}{% endblock %}
+{% block nav_users %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('admin_users') }}" class="btn btn-ghost btn-sm">← All users</a>
+{% if is_master %}
+<form method="POST" action="{{ url_for('admin_extract_profile', user_db_id=user.id) }}" style="display:inline">
+  <button type="submit" class="btn btn-primary btn-sm">🤖 Extract AI Profile</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="profile-grid">
+
+  <!-- Left column: AI profile card + assignments -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+
+    <!-- Profile card -->
+    <div class="profile-card">
+      <div class="profile-avatar">👤</div>
+      <div class="profile-name">
+        {{ profile.get('full_name') or 'Unknown User' }}
+      </div>
+      <div class="profile-sub">Telegram ID: @{{ user.tg_id }}</div>
+      {% if profile_updated %}
+      <div class="profile-sub" style="margin-top:4px">AI extracted: {{ profile_updated[:10] }}</div>
+      {% endif %}
+
+      <div class="profile-fields">
+
+        {% set fields = [
+          ('Nationality',          profile.get('nationality')),
+          ('Country of Residence', profile.get('country_of_residence')),
+          ('Phone',                profile.get('phone')),
+          ('Email',                profile.get('email')),
+          ('Age',                  profile.get('age')),
+          ('Service Interest',     profile.get('service_interest')),
+          ('UK Visa Status',       profile.get('uk_visa_status')),
+          ('Employment Type',      profile.get('employment_type')),
+          ('Budget',               profile.get('budget')),
+          ('Urgency',              profile.get('urgency')),
+        ] %}
+
+        {% for label, val in fields %}
+        <div class="profile-field">
+          <label>{{ label }}</label>
+          <div class="value {% if not val %}empty{% endif %}">{{ val or 'Not provided' }}</div>
+        </div>
+        {% endfor %}
+
+        {% if profile.get('notes') %}
+        <div class="profile-field">
+          <label>AI Notes</label>
+          <div class="value" style="font-size:.8rem;line-height:1.5">{{ profile.get('notes') }}</div>
+        </div>
+        {% endif %}
+
+      </div>
+
+      {% if not profile %}
+      <div style="text-align:center;margin-top:20px;padding:16px;background:#f8fafc;border-radius:8px">
+        <p style="font-size:.8rem;color:#94a3b8;margin-bottom:10px">
+          No AI profile extracted yet.
+        </p>
+        {% if is_master %}
+        <form method="POST" action="{{ url_for('admin_extract_profile', user_db_id=user.id) }}">
+          <button type="submit" class="btn btn-primary btn-sm">🤖 Extract Now</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="profile-actions">
+        <div style="padding:8px;background:#f8fafc;border-radius:8px">
+          <div style="font-size:.7rem;color:#94a3b8;font-weight:600;text-transform:uppercase;margin-bottom:6px">User Details</div>
+          <div style="display:flex;justify-content:space-between;font-size:.8rem">
+            <span style="color:#64748b">Language</span>
+            <span style="font-weight:600">
+              {% if user.language=='en' %}🇬🇧 English
+              {% elif user.language=='ru' %}🇷🇺 Russian
+              {% elif user.language=='uz' %}🇺🇿 Uzbek
+              {% else %}{{ user.language }}{% endif %}
+            </span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-top:4px">
+            <span style="color:#64748b">Joined</span>
+            <span style="font-weight:600">{{ user.created_at[:10] }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-top:4px">
+            <span style="color:#64748b">Total cases</span>
+            <span style="font-weight:600">{{ cases|length }}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-top:4px">
+            <span style="color:#64748b">Total files</span>
+            <span style="font-weight:600">{{ docs_with_url|length }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Consultant assignment (master only) -->
+    {% if is_master %}
+    <div class="card">
+      <div class="card-header"><h3>🛡️ Assign Consultant</h3></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin_assign_user', user_db_id=user.id) }}" style="display:flex;gap:8px;flex-wrap:wrap">
+          <select name="admin_id" style="flex:1;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:.8rem">
+            <option value="">Select consultant…</option>
+            {% for a in all_admins %}
+            <option value="{{ a.id }}">{{ a.display_name or a.username }} ({{ a.role }})</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="action" value="assign">
+          <button type="submit" class="btn btn-success btn-sm">Assign</button>
+        </form>
+
+        {% if assignments %}
+        <div style="margin-top:14px">
+          <div style="font-size:.75rem;font-weight:600;color:#64748b;margin-bottom:8px">Currently assigned to:</div>
+          {% for asgn in assignments %}
+          <div class="assign-item">
+            <div>
+              <div class="a-name">{{ asgn.display_name or asgn.username }}</div>
+              <div class="a-role">{{ asgn.role|title }}</div>
+            </div>
+            <form method="POST" action="{{ url_for('admin_assign_user', user_db_id=user.id) }}">
+              <input type="hidden" name="admin_id" value="{{ asgn.id }}">
+              <input type="hidden" name="action" value="remove">
+              <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <!-- Right column: tabs (chats, files) -->
+  <div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('tab-chats', this)">💬 Chat History ({{ cases|length }})</button>
+      <button class="tab-btn" onclick="switchTab('tab-files', this)">📎 Files ({{ docs_with_url|length }})</button>
+    </div>
+
+    <!-- Chats tab -->
+    <div class="tab-pane active" id="tab-chats">
+      {% if cases %}
+        {% for case in cases %}
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header" style="cursor:pointer" onclick="toggleCase({{ case.id }})">
+            <div>
+              <span class="badge badge-{{ case.service }}">
+                {% if case.service=='student' %}🎓 Student
+                {% elif case.service=='paye' %}💷 PAYE
+                {% elif case.service=='self' %}🧾 Self-Emp
+                {% elif case.service=='company' %}🏢 Company
+                {% else %}{{ case.service }}{% endif %}
+              </span>
+              <span style="font-size:.75rem;color:#94a3b8;margin-left:10px">Case #{{ case.id }} · {{ case.created_at[:10] }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="status-badge status-{{ case.status }}">{{ case.status }}</span>
+              <a href="{{ url_for('admin_case_detail', case_id=case.id) }}" class="btn btn-ghost btn-sm" onclick="event.stopPropagation()">Open →</a>
+              <span style="color:#94a3b8;font-size:.8rem" id="arrow-{{ case.id }}">▼</span>
+            </div>
+          </div>
+
+          <div id="case-{{ case.id }}" style="display:none">
+            {% set conv = case.conversation_history | fromjson %}
+            {% if conv %}
+            <div class="chat-messages" style="max-height:450px;overflow-y:auto;padding:16px;background:#f8fafc;display:flex;flex-direction:column;gap:8px">
+              {% for msg in conv %}
+              {% set parsed = msg.content | parse_file_tag %}
+              <div class="chat-msg {{ msg.role }}">
+                <div class="msg-avatar">{% if msg.role=='user' %}👤{% else %}🤖{% endif %}</div>
+                <div style="max-width:100%">
+                  {% if parsed.is_file %}
+                    {% if parsed.unique_id and parsed.unique_id in all_docs_by_unique_id %}
+                      {% set entry = all_docs_by_unique_id[parsed.unique_id] %}
+                    {% elif parsed.filename and parsed.filename in all_docs_by_filename %}
+                      {% set entry = all_docs_by_filename[parsed.filename] %}
+                    {% else %}
+                      {% set entry = none %}
+                    {% endif %}
+                    <div class="msg-file-bubble">
+                      {% if entry and entry.doc.media_type == 'photo' and entry.url %}
+                        <div class="msg-file-thumb">
+                          <img src="{{ url_for('admin_file_view', file_id=entry.doc.file_id) }}"
+                               alt="{{ parsed.filename }}" loading="lazy">
+                        </div>
+                      {% else %}
+                        <div class="msg-file-icon-wrap">
+                          {% if parsed.filename.lower().endswith('.pdf') %}📄
+                          {% elif parsed.filename.lower().endswith(('.doc','.docx')) %}📝
+                          {% elif parsed.filename.lower().endswith(('.xls','.xlsx')) %}📊
+                          {% elif parsed.filename.lower().endswith(('.jpg','.jpeg','.png','.gif')) %}🖼️
+                          {% else %}📎{% endif %}
+                        </div>
+                      {% endif %}
+                      <div class="msg-file-info">
+                        <div class="msg-file-name">{{ parsed.filename }}</div>
+                        <div class="msg-file-actions">
+                          {% if entry and entry.url %}
+                            <a href="{{ url_for('admin_file_view', file_id=entry.doc.file_id) }}"
+                               target="_blank" class="btn btn-ghost btn-sm">👁️ View</a>
+                            <a href="{{ url_for('admin_file_download', file_id=entry.doc.file_id, name=parsed.filename) }}"
+                               class="btn btn-primary btn-sm">⬇️ Download</a>
+                          {% else %}
+                            <span style="font-size:.7rem;color:#94a3b8">File unavailable (demo)</span>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </div>
+                  {% else %}
+                    <div class="msg-bubble markdown-body">{{ msg.content }}</div>
+                  {% endif %}
+                  <div class="msg-meta">
+                    {{ msg.role|title }}
+                    {% if msg.timestamp %} · {{ msg.timestamp[:16]|replace('T',' ') }}{% endif %}
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div style="padding:20px;text-align:center;color:#94a3b8;font-size:.85rem">No messages in this case.</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state">
+          <div class="es-icon">💬</div>
+          <h3>No chat history</h3>
+          <p>This user hasn't started any service consultation yet.</p>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Files tab -->
+    <div class="tab-pane" id="tab-files">
+      {% if docs_with_url %}
+        <div class="files-grid">
+          {% for item in docs_with_url %}
+          {% set doc = item.doc %}
+          {% set url = item.url %}
+          <div class="file-card">
+            <div class="file-preview">
+              {% if doc.media_type == 'photo' and url %}
+                <img src="{{ url_for('admin_file_view', file_id=doc.file_id) }}" alt="{{ doc.filename }}" loading="lazy">
+              {% else %}
+                <div class="file-type-icon">
+                  {% if doc.filename and doc.filename.lower().endswith('.pdf') %}📄
+                  {% elif doc.filename and (doc.filename.lower().endswith('.doc') or doc.filename.lower().endswith('.docx')) %}📝
+                  {% elif doc.filename and (doc.filename.lower().endswith('.jpg') or doc.filename.lower().endswith('.jpeg') or doc.filename.lower().endswith('.png')) %}🖼️
+                  {% else %}📎{% endif %}
+                </div>
+              {% endif %}
+            </div>
+            <div class="file-info">
+              <div class="file-name" title="{{ doc.filename or doc.doc_type }}">
+                {{ doc.filename or doc.doc_type or 'File' }}
+              </div>
+              <div class="file-meta">
+                Case #{{ doc.case_id }} ·
+                {{ doc.service if doc.service else '' }} ·
+                {{ doc.created_at[:10] if doc.created_at else '' }}
+              </div>
+              <div class="file-actions">
+                {% if url %}
+                <a href="{{ url_for('admin_file_view', file_id=doc.file_id) }}"
+                   target="_blank" class="btn btn-ghost btn-sm">👁️ View</a>
+                <a href="{{ url_for('admin_file_download', file_id=doc.file_id, name=doc.filename or 'file') }}"
+                   class="btn btn-primary btn-sm">⬇️ Download</a>
+                {% else %}
+                <span style="font-size:.7rem;color:#94a3b8">Unavailable</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <div class="es-icon">📎</div>
+          <h3>No files uploaded</h3>
+          <p>This user hasn't sent any documents or photos yet.</p>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleCase(id) {
+  const el = document.getElementById('case-' + id);
+  const arrow = document.getElementById('arrow-' + id);
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    arrow.textContent = '▲';
+    // scroll to bottom of chat
+    const chat = el.querySelector('.chat-messages');
+    if (chat) chat.scrollTop = chat.scrollHeight;
+  } else {
+    el.style.display = 'none';
+    arrow.textContent = '▼';
+  }
+}
+</script>
+{% endblock %}

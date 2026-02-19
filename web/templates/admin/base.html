@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Admin{% endblock %} — Brightway Consulting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+</head>
+<body>
+
+<!-- Flash messages -->
+<div class="flash-wrap" id="flash-wrap">
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+  <div class="flash {{ cat }}">
+    <span>{{ msg }}</span>
+    <span class="flash-close" onclick="this.parentElement.remove()">&times;</span>
+  </div>
+  {% endfor %}
+{% endwith %}
+</div>
+
+<div class="admin-wrap">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="admin-sidebar-brand">
+      <h2>⚡ Brightway Admin</h2>
+      <div class="role-badge {% if session.admin_role == 'master' %}master{% endif %}">
+        {{ session.admin_role|upper if session.admin_role else 'ADMIN' }}
+      </div>
+      <div style="font-size:.75rem;color:#64748b;margin-top:6px">{{ session.admin_display or session.admin_username }}</div>
+    </div>
+
+    <nav class="admin-nav">
+      <a href="{{ url_for('admin_dashboard') }}" class="{% block nav_dashboard %}{% endblock %}">
+        📊 Dashboard
+      </a>
+      <a href="{{ url_for('admin_cases') }}" class="{% block nav_cases %}{% endblock %}">
+        📋 Cases
+      </a>
+      <a href="{{ url_for('admin_users') }}" class="{% block nav_users %}{% endblock %}">
+        👥 Users
+      </a>
+      {% if session.admin_role == 'master' %}
+      <div class="nav-sep"></div>
+      <a href="{{ url_for('admin_admins') }}" class="{% block nav_admins %}{% endblock %}">
+        🛡️ Consultants
+      </a>
+      <a href="{{ url_for('admin_reports') }}" class="{% block nav_reports %}{% endblock %}">
+        📈 Reports
+      </a>
+      {% endif %}
+      <div class="nav-sep"></div>
+      <a href="{{ url_for('index') }}" target="_blank">🌐 Website</a>
+      <a href="{{ url_for('admin_logout') }}" class="logout">🚪 Logout</a>
+    </nav>
+  </aside>
+
+  <!-- Main area -->
+  <div class="admin-main">
+    <div class="admin-topbar">
+      <h1>{% block page_title %}Admin{% endblock %}</h1>
+      <div class="admin-topbar-right">
+        {% block topbar_actions %}{% endblock %}
+      </div>
+    </div>
+
+    <div class="admin-body">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script>
+// Auto-dismiss flash after 5 s
+setTimeout(() => {
+  document.querySelectorAll('.flash').forEach(el => el.remove());
+}, 5000);
+
+// Tab switching
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+  btn.classList.add('active');
+}
+
+// Render markdown in chat bubbles
+document.addEventListener('DOMContentLoaded', () => {
+  marked.setOptions({ breaks: true, gfm: true });
+  document.querySelectorAll('.msg-bubble.markdown-body').forEach(el => {
+    el.innerHTML = marked.parse(el.textContent);
+  });
+});
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

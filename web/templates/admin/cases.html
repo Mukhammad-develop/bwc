@@ -1,0 +1,91 @@
+{% extends "admin/base.html" %}
+{% block title %}Cases{% endblock %}
+{% block page_title %}Cases{% endblock %}
+{% block nav_cases %}active{% endblock %}
+
+{% block content %}
+
+<form method="GET" class="filter-bar">
+  <select name="service" onchange="this.form.submit()">
+    <option value="">All services</option>
+    {% for s in ['student','paye','self','company'] %}
+    <option value="{{ s }}" {% if filter_service==s %}selected{% endif %}>{{ s|title }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" onchange="this.form.submit()">
+    <option value="">All statuses</option>
+    {% for s in ['active','completed','cancelled'] %}
+    <option value="{{ s }}" {% if filter_status==s %}selected{% endif %}>{{ s|title }}</option>
+    {% endfor %}
+  </select>
+  <select name="payment" onchange="this.form.submit()">
+    <option value="">All payments</option>
+    {% for s in ['pending','received','refunded'] %}
+    <option value="{{ s }}" {% if filter_payment==s %}selected{% endif %}>{{ s|title }}</option>
+    {% endfor %}
+  </select>
+  {% if filter_service or filter_status or filter_payment %}
+  <a href="{{ url_for('admin_cases') }}" class="btn btn-ghost btn-sm">Clear</a>
+  {% endif %}
+  <span style="margin-left:auto;font-size:.8rem;color:#94a3b8">{{ cases|length }} case(s)</span>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Service</th><th>User</th><th>Language</th>
+          <th>Status</th><th>Payment</th><th>Created</th><th>Updated</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cases %}
+        <tr>
+          <td style="color:#94a3b8">#{{ c.id }}</td>
+          <td>
+            <span class="badge badge-{{ c.service }}">
+              {% if c.service=='student' %}🎓 Student
+              {% elif c.service=='paye' %}💷 PAYE
+              {% elif c.service=='self' %}🧾 Self-Emp
+              {% elif c.service=='company' %}🏢 Company
+              {% else %}📄 {{ c.service }}{% endif %}
+            </span>
+          </td>
+          <td>
+            <a href="{{ url_for('admin_user_profile', user_db_id=c.user_db_id) }}"
+               style="color:#2563eb;text-decoration:none;font-weight:600;font-size:.8rem">
+              @{{ c.tg_id }}
+            </a>
+          </td>
+          <td style="font-size:.8rem;color:#64748b">
+            {% if c.language=='en' %}🇬🇧{% elif c.language=='ru' %}🇷🇺{% elif c.language=='uz' %}🇺🇿{% endif %}
+            {{ c.language|upper }}
+          </td>
+          <td><span class="status-badge status-{{ c.status }}">{{ c.status }}</span></td>
+          <td><span class="status-badge status-{{ c.payment_status }}">{{ c.payment_status }}</span></td>
+          <td style="font-size:.75rem;color:#94a3b8">{{ c.created_at[:10] }}</td>
+          <td style="font-size:.75rem;color:#94a3b8">{{ c.updated_at[:10] }}</td>
+          <td>
+            <a href="{{ url_for('admin_case_detail', case_id=c.id) }}" class="btn btn-primary btn-sm">
+              💬 Open
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9">
+            <div class="empty-state" style="padding:40px">
+              <div class="es-icon">📭</div>
+              <h3>No cases found</h3>
+              <p>Try changing the filters above.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

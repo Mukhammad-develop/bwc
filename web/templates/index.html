@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Brightway Consulting - UK Visa, Tax & Accounting Services</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modern.css') }}">
+</head>
+<body>
+<div class="scroll-progress"></div>
+
+<nav id="nav">
+    <div class="nav-content">
+        <div class="logo">Brightway Consulting</div>
+        <div class="nav-right">
+            <a href="{{ url_for('services') }}" class="nav-link" data-i18n="navServices">Services</a>
+            <a href="{{ url_for('contact') }}" class="nav-link" data-i18n="navContact">Contact</a>
+            <div class="lang-switcher">
+                <button class="lang-btn" id="langBtn" onclick="toggleLangDropdown()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="2" y1="12" x2="22" y2="12"/>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <span id="currentLangLabel">EN</span>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:10px;height:10px;opacity:.5">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </button>
+                <div class="lang-dropdown" id="langDropdown">
+                    <button class="lang-option active" data-lang="en" onclick="setLanguage('en')">
+                        <span class="flag">🇬🇧</span>English<span class="check">✓</span>
+                    </button>
+                    <button class="lang-option" data-lang="ru" onclick="setLanguage('ru')">
+                        <span class="flag">🇷🇺</span>Русский<span class="check">✓</span>
+                    </button>
+                    <button class="lang-option" data-lang="uz" onclick="setLanguage('uz')">
+                        <span class="flag">🇺🇿</span>O'zbek<span class="check">✓</span>
+                    </button>
+                </div>
+            </div>
+            {% if session.admin_logged_in %}
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-admin-btn" data-i18n="navAdmin">Admin</a>
+            {% endif %}
+        </div>
+    </div>
+</nav>
+
+<section class="hero">
+    <div class="hero-glow"></div>
+    <div class="hero-glow-2"></div>
+    <div class="container">
+        <div class="hero-eyebrow" data-i18n="heroEyebrow">Your Trusted UK Partner</div>
+        <h1 data-i18n="heroTitle">Visas. Tax. Accounting.<br>Made Simple.</h1>
+        <p class="hero-subtitle" data-i18n="heroSubtitle">Expert guidance for UK student visas, tax refunds, and company accounting — powered by AI, perfected by professionals.</p>
+        <div class="hero-cta">
+            <a href="https://t.me/YourBotUsername" class="btn-primary" data-i18n="heroCta">Chat with AI Assistant</a>
+        </div>
+    </div>
+</section>
+
+<section class="feature-section">
+    <div class="container">
+        <div class="feature-header">
+            <h2 class="feature-header-title" data-i18n="featHeader">Four specialized services.<br>One seamless experience.</h2>
+            <p class="feature-header-desc" data-i18n="featHeaderDesc">Whether you're a student, worker, entrepreneur, or business owner — we've got you covered.</p>
+        </div>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                        <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+                    </svg>
+                </div>
+                <div class="feature-tag student" data-i18n="tagStudent">Students</div>
+                <div class="feature-title" data-i18n="feat1Title">Student Visa & University</div>
+                <div class="feature-desc" data-i18n="feat1Desc">Complete support for UK student visa applications and university admissions through our QA partner institutions.</div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+                        <line x1="1" y1="10" x2="23" y2="10"/>
+                    </svg>
+                </div>
+                <div class="feature-tag paye" data-i18n="tagPaye">PAYE Workers</div>
+                <div class="feature-title" data-i18n="feat2Title">PAYE Tax Refund</div>
+                <div class="feature-desc" data-i18n="feat2Desc">Maximize your tax refund from HMRC. We handle all paperwork and follow up on your behalf.</div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                        <polyline points="10 9 9 9 8 9"/>
+                    </svg>
+                </div>
+                <div class="feature-tag self" data-i18n="tagSelf">Self-Employed</div>
+                <div class="feature-title" data-i18n="feat3Title">Self Assessment Tax</div>
+                <div class="feature-desc" data-i18n="feat3Desc">Self Assessment tax returns made simple. We ensure compliance and find all available deductions.</div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                </div>
+                <div class="feature-tag company" data-i18n="tagCompany">Companies</div>
+                <div class="feature-title" data-i18n="feat4Title">Company Accounting</div>
+                <div class="feature-desc" data-i18n="feat4Desc">Full accounting for UK limited companies: bookkeeping, payroll, VAT, and annual accounts.</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="process-section">
+    <div class="container">
+        <div class="section-header">
+            <h2 class="section-title" data-i18n="processTitle">How it works</h2>
+            <p class="section-desc" data-i18n="processDesc">Four simple steps from first contact to completed service.</p>
+        </div>
+        <div class="process-flow">
+            <div class="process-item">
+                <div class="process-content">
+                    <div class="process-label ai" data-i18n="step1Label">Step 1 • AI</div>
+                    <div class="process-title" data-i18n="step1Title">Start a conversation</div>
+                    <p class="process-text" data-i18n="step1Text">Message our AI-powered Telegram bot in English, Uzbek, or Russian. Choose your service and tell us about your situation.</p>
+                </div>
+                <div class="process-num">1</div>
+                <div class="process-visual">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        <line x1="9" y1="10" x2="9.01" y2="10"/>
+                        <line x1="12" y1="10" x2="12.01" y2="10"/>
+                        <line x1="15" y1="10" x2="15.01" y2="10"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="process-item">
+                <div class="process-content">
+                    <div class="process-label ai" data-i18n="step2Label">Step 2 • AI</div>
+                    <div class="process-title" data-i18n="step2Title">Share your details</div>
+                    <p class="process-text" data-i18n="step2Text">Our AI assistant will have a natural conversation to understand your needs and collect necessary information.</p>
+                </div>
+                <div class="process-num">2</div>
+                <div class="process-visual">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="8.5" cy="7" r="4"/>
+                        <polyline points="17 11 19 13 23 9"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="process-item">
+                <div class="process-content">
+                    <div class="process-label ai" data-i18n="step3Label">Step 3 • AI</div>
+                    <div class="process-title" data-i18n="step3Title">Upload documents</div>
+                    <p class="process-text" data-i18n="step3Text">The AI guides you on which documents to upload. Send them directly in the chat at your convenience.</p>
+                </div>
+                <div class="process-num">3</div>
+                <div class="process-visual">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="process-item">
+                <div class="process-content">
+                    <div class="process-label human" data-i18n="step4Label">Step 4 • Human Experts</div>
+                    <div class="process-title" data-i18n="step4Title">We handle the rest</div>
+                    <p class="process-text" data-i18n="step4Text">Our team reviews your case, completes all paperwork, and manages communications with relevant authorities.</p>
+                </div>
+                <div class="process-num">4</div>
+                <div class="process-visual">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="stats-section">
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat">
+                <div class="stat-value">24/7</div>
+                <div class="stat-label" data-i18n="stat1">AI Support Available</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">3</div>
+                <div class="stat-label" data-i18n="stat2">Languages Supported</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value">100%</div>
+                <div class="stat-label" data-i18n="stat3">UK Compliant</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container">
+        <div class="cta-box">
+            <h2 class="cta-title" data-i18n="ctaTitle">Ready to get started?</h2>
+            <p class="cta-text" data-i18n="ctaText">Join hundreds of satisfied clients who trust Brightway Consulting for their UK visa, tax, and accounting needs.</p>
+            <a href="https://t.me/YourBotUsername" class="btn-primary" data-i18n="ctaBtn">Start Chat on Telegram</a>
+            <p class="cta-sub" data-i18n="ctaSub">Secure • Confidential • Professional</p>
+        </div>
+    </div>
+</section>
+
+<footer>
+    <div class="container">
+        <div class="footer-content">
+            <span data-i18n="footerCopyright">&copy; 2026 Brightway Consulting. All rights reserved.</span> |
+            <a href="{{ url_for('services') }}" data-i18n="footerServices">Services</a> |
+            <a href="{{ url_for('contact') }}" data-i18n="footerContact">Contact</a>
+            {% if not session.admin_logged_in %}
+            | <a href="{{ url_for('admin_login') }}" data-i18n="footerAdmin">Admin</a>
+            {% endif %}
+        </div>
+    </div>
+</footer>
+
+<script src="{{ url_for('static', filename='js/modern.js') }}"></script>
+</body>
+</html>

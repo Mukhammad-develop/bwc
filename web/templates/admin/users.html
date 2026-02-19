@@ -1,0 +1,77 @@
+{% extends "admin/base.html" %}
+{% block title %}Users{% endblock %}
+{% block page_title %}Users{% endblock %}
+{% block nav_users %}active{% endblock %}
+
+{% block content %}
+
+<div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+  <span style="font-size:.85rem;color:#64748b">{{ users|length }} user(s)</span>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Telegram ID</th>
+          <th>Language</th>
+          <th>AI Name</th>
+          <th>AI Nationality</th>
+          <th>Service Interest</th>
+          <th>Cases</th>
+          <th>Files</th>
+          <th>Joined</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        {% set prof = u.extracted_data | fromjson if u.extracted_data else {} %}
+        <tr>
+          <td>
+            <a href="{{ url_for('admin_user_profile', user_db_id=u.id) }}"
+               style="color:#2563eb;text-decoration:none;font-weight:700">
+              @{{ u.tg_id }}
+            </a>
+          </td>
+          <td style="font-size:.8rem">
+            {% if u.language=='en' %}🇬🇧{% elif u.language=='ru' %}🇷🇺{% elif u.language=='uz' %}🇺🇿{% endif %}
+            {{ u.language|upper if u.language else '–' }}
+          </td>
+          <td style="font-size:.8rem;color:#374151">
+            {{ prof.get('full_name') or '' }}
+            {% if not prof.get('full_name') %}<span style="color:#cbd5e1;font-style:italic">–</span>{% endif %}
+          </td>
+          <td style="font-size:.8rem;color:#374151">
+            {{ prof.get('nationality') or '–' }}
+          </td>
+          <td style="font-size:.8rem;color:#374151">
+            {{ prof.get('service_interest') or '–' }}
+          </td>
+          <td><span class="badge badge-default">{{ u.case_count }}</span></td>
+          <td><span class="badge badge-default">{{ u.doc_count }}</span></td>
+          <td style="font-size:.75rem;color:#94a3b8">{{ u.created_at[:10] if u.created_at else '–' }}</td>
+          <td>
+            <a href="{{ url_for('admin_user_profile', user_db_id=u.id) }}" class="btn btn-primary btn-sm">
+              👤 Profile
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="9">
+            <div class="empty-state" style="padding:40px">
+              <div class="es-icon">👥</div>
+              <h3>No users yet</h3>
+              <p>Users will appear here after they start the Telegram bot.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

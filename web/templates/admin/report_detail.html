@@ -1,0 +1,108 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ report.report_type|title }} Report{% endblock %}
+{% block page_title %}{{ report.report_type|title }} Report — {{ report.period_start[:10] }}{% endblock %}
+{% block nav_reports %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('admin_reports') }}" class="btn btn-ghost btn-sm">← All reports</a>
+{% endblock %}
+
+{% block content %}
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+
+  <!-- AI Conclusion -->
+  <div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">
+        <h2>🤖 AI Business Conclusion</h2>
+        <span class="r-type-badge r-type-{{ report.report_type }}">{{ report.report_type|upper }}</span>
+      </div>
+      <div class="card-body">
+        {% if report.ai_conclusion %}
+        <div class="conclusion-box">{{ report.ai_conclusion }}</div>
+        {% else %}
+        <div class="empty-state" style="padding:30px">
+          <div class="es-icon">🤖</div>
+          <h3>No AI conclusion</h3>
+          <p>OpenAI API key was not set when this report was generated.</p>
+        </div>
+        {% endif %}
+        <div style="margin-top:12px;font-size:.75rem;color:#94a3b8">
+          Generated: {{ report.created_at[:16]|replace('T',' ') }} UTC ·
+          Period: {{ report.period_start[:10] }} → {{ report.period_end[:10] }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Service breakdown chart -->
+    {% if stats.get('by_service') %}
+    <div class="card">
+      <div class="card-header"><h3>Cases by Service</h3></div>
+      <div class="card-body">
+        {% set max_v = namespace(v=1) %}
+        {% for k, v in stats.by_service.items() %}{% if v > max_v.v %}{% set max_v.v = v %}{% endif %}{% endfor %}
+        <div class="bar-chart">
+          {% for svc, cnt in stats.by_service.items() %}
+          {% set pct = (cnt / max_v.v * 100)|int %}
+          <div class="bar-row">
+            <div class="bar-label">
+              {% if svc=='student' %}🎓{% elif svc=='paye' %}💷{% elif svc=='self' %}🧾{% elif svc=='company' %}🏢{% else %}📄{% endif %}
+              {{ svc|title }}
+            </div>
+            <div class="bar-track">
+              <div class="bar-fill fill-{{ svc }}" style="width:{{ pct }}%"></div>
+            </div>
+            <div class="bar-count">{{ cnt }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Stats sidebar -->
+  <div>
+    <div class="card">
+      <div class="card-header"><h3>📊 Period Statistics</h3></div>
+      <div class="card-body">
+        <div style="display:flex;flex-direction:column;gap:12px">
+
+          {% set stat_items = [
+            ('👥', 'New Users',       stats.get('new_users', 0)),
+            ('📋', 'New Cases',       stats.get('new_cases', 0)),
+            ('💰', 'Payments Rcvd',   stats.get('paid', 0)),
+            ('✅', 'Cases Completed', stats.get('completed', 0)),
+            ('🔄', 'Active Cases',    stats.get('active', 0)),
+            ('📎', 'Files Uploaded',  stats.get('docs', 0)),
+          ] %}
+
+          {% for icon, label, value in stat_items %}
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span>{{ icon }}</span>
+              <span style="font-size:.85rem;font-weight:500;color:#374151">{{ label }}</span>
+            </div>
+            <span style="font-size:1.25rem;font-weight:800;color:#0f172a">{{ value }}</span>
+          </div>
+          {% endfor %}
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Regenerate -->
+    <div class="card" style="margin-top:16px">
+      <div class="card-body" style="text-align:center">
+        <p style="font-size:.8rem;color:#64748b;margin-bottom:12px">Generate a fresh report for the same period type:</p>
+        <form method="POST" action="{{ url_for('admin_generate_report', report_type=report.report_type) }}">
+          <button type="submit" class="btn btn-primary btn-block">↻ Regenerate {{ report.report_type|title }} Report</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
