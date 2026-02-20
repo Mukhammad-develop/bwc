@@ -279,7 +279,7 @@ def ask_ai(conversation: list, service: str, lang: str) -> str:
             messages.append({"role": msg["role"], "content": msg["content"]})
         print(f"[AI] {service} | {len(conversation)} msgs | lang={lang}")
         resp = client.chat.completions.create(
-            model="gpt-5-mini",
+            model="gpt-5.2-2025-12-11",
             messages=messages,
             max_completion_tokens=800,
         )
