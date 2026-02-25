@@ -367,8 +367,17 @@ def save_user_profile(user_db_id, data):
         conn.commit()
 
 
+UPLOADS_DIR = Path(__file__).resolve().parent.parent / "tg_bot" / "uploads"
+
+
 def get_tg_file_url(file_id):
-    if not BOT_TOKEN or not file_id:
+    if not file_id:
+        return None
+    # Files downloaded by the userbot are stored locally
+    if file_id.startswith("local:"):
+        filename = file_id[6:]
+        return url_for("admin_local_file", filename=filename)
+    if not BOT_TOKEN:
         return None
     try:
         r = requests.get(
@@ -382,6 +391,16 @@ def get_tg_file_url(file_id):
     except Exception as e:
         print(f"[TG] file url error: {e}")
     return None
+
+
+@app.route("/admin/files/local/<path:filename>")
+@login_required
+def admin_local_file(filename):
+    """Serve a file that was downloaded by the userbot."""
+    safe = UPLOADS_DIR / Path(filename).name   # prevent directory traversal
+    if not safe.exists():
+        return "File not found", 404
+    return send_file(str(safe), as_attachment=False)
 
 
 # ─────────────────────────── STATS & REPORTS ──────────────────────
