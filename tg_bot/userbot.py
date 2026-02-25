@@ -85,21 +85,31 @@ def lang_buttons():
     ]
 
 
-async def typing(chat_id):
-    """Send a typing action once."""
+async def safe_typing(event):
+    """
+    Return a typing context manager using the properly resolved input peer.
+    Falls back silently if entity can't be resolved.
+    """
     try:
-        await client.action(chat_id, "typing").__aenter__()
+        peer = await event.get_input_chat()
+        return client.action(peer, "typing")
     except Exception:
-        pass
+        return _NullContext()
 
 
-async def safe_send(chat_id, text, **kwargs):
-    """Send a message, retrying once on flood wait."""
+class _NullContext:
+    """No-op async context manager used as a fallback when typing fails."""
+    async def __aenter__(self): return self
+    async def __aexit__(self, *_): pass
+
+
+async def safe_send(event, text, **kwargs):
+    """Reply in the same chat, retrying once on flood wait."""
     try:
-        await client.send_message(chat_id, text, **kwargs)
+        await event.respond(text, **kwargs)
     except FloodWaitError as e:
         await asyncio.sleep(e.seconds + 1)
-        await client.send_message(chat_id, text, **kwargs)
+        await event.respond(text, **kwargs)
 
 
 # ── /start handler ────────────────────────────────────────────────────────────
@@ -110,7 +120,7 @@ async def handle_start(event):
     with db.connect(DB_PATH) as conn:
         db.get_or_create_user(conn, tg_id)
         lang = db.get_language(conn, tg_id)
-    await safe_send(event.chat_id, t(lang, "welcome"), buttons=lang_buttons())
+    await safe_send(event, t(lang, "welcome"), buttons=lang_buttons())
 
 
 # ── /help handler ─────────────────────────────────────────────────────────────
@@ -118,11 +128,11 @@ async def handle_start(event):
 @client.on(events.NewMessage(pattern=r"^/help$", incoming=True, func=lambda e: e.is_private))
 async def handle_help(event):
     tg_id = event.sender_id
-    await client.action(event.chat_id, "typing")
-    with db.connect(DB_PATH) as conn:
-        db.get_or_create_user(conn, tg_id)
-        lang = db.get_language(conn, tg_id)
-    await safe_send(event.chat_id, t(lang, "help_text"))
+    async with await safe_typing(event):
+        with db.connect(DB_PATH) as conn:
+            db.get_or_create_user(conn, tg_id)
+            lang = db.get_language(conn, tg_id)
+    await safe_send(event, t(lang, "help_text"))
 
 
 # ── /mycase handler ────────────────────────────────────────────────────────────
@@ -130,23 +140,23 @@ async def handle_help(event):
 @client.on(events.NewMessage(pattern=r"^/(mycase|case)$", incoming=True, func=lambda e: e.is_private))
 async def handle_mycase(event):
     tg_id = event.sender_id
-    await client.action(event.chat_id, "typing")
-    with db.connect(DB_PATH) as conn:
-        user_id = db.get_or_create_user(conn, tg_id)
-        lang    = db.get_language(conn, tg_id)
-        case    = db.get_active_case(conn, user_id)
-        if not case or not case["service"]:
-            await safe_send(event.chat_id, t(lang, "case_none"))
-            return
-        doc_count = len(db.list_documents(conn, case["id"]))
-        await safe_send(
-            event.chat_id,
-            t(lang, "case_info",
-              service=case["service"],
-              status=case["status"],
-              payment=case["payment_status"],
-              doc_count=doc_count),
-        )
+    async with await safe_typing(event):
+        with db.connect(DB_PATH) as conn:
+            user_id   = db.get_or_create_user(conn, tg_id)
+            lang      = db.get_language(conn, tg_id)
+            case      = db.get_active_case(conn, user_id)
+            doc_count = len(db.list_documents(conn, case["id"])) if case else 0
+    if not case or not case["service"]:
+        await safe_send(event, t(lang, "case_none"))
+        return
+    await safe_send(
+        event,
+        t(lang, "case_info",
+          service=case["service"],
+          status=case["status"],
+          payment=case["payment_status"],
+          doc_count=doc_count),
+    )
 
 
 # ── Inline keyboard callback (language selection) ─────────────────────────────
@@ -165,7 +175,7 @@ async def handle_callback(event):
         try:
             await event.edit(t(lang_code, "intro"), buttons=None)
         except Exception:
-            await safe_send(event.chat_id, t(lang_code, "intro"))
+            await safe_send(event, t(lang_code, "intro"))
 
     await event.answer()
 
@@ -182,7 +192,9 @@ async def handle_text(event):
     if not text:
         return
 
-    async with client.action(event.chat_id, "typing"):
+    lang = "en"
+    case = None
+    async with await safe_typing(event):
         with db.connect(DB_PATH) as conn:
             user_id  = db.get_or_create_user(conn, tg_id)
             lang     = db.get_language(conn, tg_id)
@@ -194,7 +206,6 @@ async def handle_text(event):
             db.add_conversation_message(conn, case["id"], "user", text)
             conversation = db.get_conversation(conn, case["id"])
 
-        # AI call in thread-pool (blocking)
         reply = await asyncio.get_event_loop().run_in_executor(
             executor, ask_ai, conversation, case["service"], lang
         )
@@ -202,9 +213,9 @@ async def handle_text(event):
     with db.connect(DB_PATH) as conn:
         if reply:
             db.add_conversation_message(conn, case["id"], "assistant", reply)
-            await safe_send(event.chat_id, reply)
+            await safe_send(event, reply)
         else:
-            await safe_send(event.chat_id, t(lang, "ai_error"))
+            await safe_send(event, t(lang, "ai_error"))
 
 
 # ── Document / photo handler ──────────────────────────────────────────────────
@@ -240,19 +251,20 @@ async def handle_media(event):
         # Voice, video notes, stickers etc — ignore silently
         return
 
-    async with client.action(event.chat_id, "typing"):
+    lang = "en"
+    case = None
+    async with await safe_typing(event):
         # Download file to uploads dir
         dest_path = UPLOADS_DIR / filename
         try:
             await msg.download_media(file=str(dest_path))
         except Exception as e:
             print(f"[Userbot] download error: {e}")
-            filename   = f"file_{unique_id}"
-            dest_path  = UPLOADS_DIR / filename
+            filename  = f"file_{unique_id}"
+            dest_path = UPLOADS_DIR / filename
 
-        # file_id for DB: local:<filename>  (served by Flask)
-        file_id     = f"local:{filename}"
-        file_uid    = unique_id
+        file_id  = f"local:{filename}"
+        file_uid = unique_id
 
         with db.connect(DB_PATH) as conn:
             user_id  = db.get_or_create_user(conn, tg_id)
@@ -276,9 +288,9 @@ async def handle_media(event):
     with db.connect(DB_PATH) as conn:
         if reply:
             db.add_conversation_message(conn, case["id"], "assistant", reply)
-            await safe_send(event.chat_id, reply)
+            await safe_send(event, reply)
         else:
-            await safe_send(event.chat_id, t(lang, "doc_received"))
+            await safe_send(event, t(lang, "doc_received"))
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
