@@ -293,6 +293,34 @@ async def handle_media(event):
             await safe_send(event, t(lang, "doc_received"))
 
 
+# ── Admin → user send-queue loop ─────────────────────────────────────────────
+
+async def send_queue_loop():
+    """
+    Poll the pending_sends table every 3 seconds and deliver any queued
+    messages to users via the personal Telegram account (this userbot).
+    Messages arrive from the admin panel and must be sent as the real user,
+    not as the bot.
+    """
+    print("[Userbot] send_queue_loop started")
+    while True:
+        await asyncio.sleep(3)
+        try:
+            with db.connect(DB_PATH) as conn:
+                rows = db.get_pending_sends(conn)
+            for row in rows:
+                try:
+                    tg_id = int(row["user_tg_id"])
+                    await client.send_message(tg_id, row["message"])
+                    with db.connect(DB_PATH) as conn:
+                        db.mark_send_done(conn, row["id"])
+                    print(f"[Userbot] queued msg sent → {tg_id}")
+                except Exception as e:
+                    print(f"[Userbot] send_queue error for {row['user_tg_id']}: {e}")
+        except Exception as e:
+            print(f"[Userbot] send_queue_loop error: {e}")
+
+
 # ── Main ─────────────────────────────────────────────────────────────────────
 
 async def main():
@@ -319,7 +347,12 @@ async def main():
     print(f"[Userbot] Running as @{me.username} ({me.first_name})")
     print(f"[Userbot] DB: {DB_PATH}")
     print("[Userbot] Listening for messages…")
-    await client.run_until_disconnected()
+
+    # Run the send-queue loop and the client concurrently
+    await asyncio.gather(
+        client.run_until_disconnected(),
+        send_queue_loop(),
+    )
 
 
 if __name__ == "__main__":

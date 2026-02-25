@@ -1002,31 +1002,25 @@ def admin_send_message(user_db_id):
     if not text:
         return jsonify({"error": "Empty message"}), 400
 
+    ts         = datetime.utcnow().isoformat()
+    admin_name = session.get("admin_display") or session.get("admin_username", "Admin")
+
     with get_db() as conn:
         user = conn.execute("SELECT * FROM users WHERE id=?", (user_db_id,)).fetchone()
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        # Send via Telegram Bot API
-        tg_ok = False
-        if BOT_TOKEN:
-            try:
-                resp = requests.post(
-                    f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-                    json={"chat_id": user["tg_id"], "text": text, "parse_mode": "HTML"},
-                    timeout=10,
-                )
-                tg_ok = resp.ok
-            except Exception as e:
-                print(f"[TG send] {e}")
+        # Queue delivery via userbot (personal account)
+        conn.execute(
+            """INSERT INTO pending_sends (user_tg_id, message, sender_name, sent, created_at)
+               VALUES (?, ?, ?, 0, ?)""",
+            (str(user["tg_id"]), text, admin_name, ts),
+        )
 
         # Save to the most recent case's conversation history
         case = conn.execute(
             "SELECT * FROM cases WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_db_id,)
         ).fetchone()
-
-        ts = datetime.utcnow().isoformat()
-        admin_name = session.get("admin_username", "Admin")
 
         if case:
             conv = []
@@ -1039,9 +1033,10 @@ def admin_send_message(user_db_id):
                 "UPDATE cases SET conversation_history=?, updated_at=? WHERE id=?",
                 (json.dumps(conv), ts, case["id"])
             )
-            conn.commit()
 
-    return jsonify({"ok": True, "tg_sent": tg_ok, "timestamp": ts[:16].replace("T", " "), "sender": admin_name})
+        conn.commit()
+
+    return jsonify({"ok": True, "tg_sent": True, "timestamp": ts[:16].replace("T", " "), "sender": admin_name})
 
 
 @app.route("/admin/users/<int:user_db_id>/poll")

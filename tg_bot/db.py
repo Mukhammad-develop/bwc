@@ -5,6 +5,16 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS pending_sends (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_tg_id  TEXT    NOT NULL,
+    message     TEXT    NOT NULL,
+    sender_name TEXT    DEFAULT 'Admin',
+    sent        INTEGER DEFAULT 0,
+    created_at  TEXT    NOT NULL,
+    sent_at     TEXT
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     tg_id INTEGER UNIQUE NOT NULL,
@@ -91,6 +101,19 @@ def init_db(db_path: str) -> None:
             conn.commit()
         except sqlite3.OperationalError:
             pass
+        # Create pending_sends if missing (older DBs)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS pending_sends (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_tg_id  TEXT    NOT NULL,
+                message     TEXT    NOT NULL,
+                sender_name TEXT    DEFAULT 'Admin',
+                sent        INTEGER DEFAULT 0,
+                created_at  TEXT    NOT NULL,
+                sent_at     TEXT
+            )
+        """)
+        conn.commit()
 
 
 def get_or_create_user(conn: sqlite3.Connection, tg_id: int) -> int:
@@ -201,6 +224,30 @@ def get_missing_docs(conn: sqlite3.Connection, case_id: int) -> List[str]:
         return json.loads(row["missing_docs"] or "[]")
     except json.JSONDecodeError:
         return []
+
+
+def queue_admin_send(conn: sqlite3.Connection, user_tg_id: str, message: str, sender_name: str = "Admin") -> None:
+    """Queue a message to be delivered to the user via the userbot."""
+    conn.execute(
+        "INSERT INTO pending_sends (user_tg_id, message, sender_name, created_at) VALUES (?, ?, ?, ?)",
+        (str(user_tg_id), message, sender_name, _now_iso()),
+    )
+    conn.commit()
+
+
+def get_pending_sends(conn: sqlite3.Connection) -> List[sqlite3.Row]:
+    """Return all unsent queued messages."""
+    return conn.execute(
+        "SELECT * FROM pending_sends WHERE sent = 0 ORDER BY id ASC"
+    ).fetchall()
+
+
+def mark_send_done(conn: sqlite3.Connection, send_id: int) -> None:
+    conn.execute(
+        "UPDATE pending_sends SET sent=1, sent_at=? WHERE id=?",
+        (_now_iso(), send_id),
+    )
+    conn.commit()
 
 
 def set_missing_docs(conn: sqlite3.Connection, case_id: int, missing: List[str]) -> None:
