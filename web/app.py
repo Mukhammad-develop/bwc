@@ -387,6 +387,88 @@ def admin_logout():
     return redirect(url_for("index"))
 
 
+# ─────────────────────────── PROFILE ──────────────────────────────
+
+@app.route("/admin/profile", methods=["GET", "POST"])
+@login_required
+def admin_profile():
+    is_env_master = (session.get("admin_role") == "master" and session.get("admin_id") is None)
+
+    if request.method == "POST":
+        action = request.form.get("action")
+
+        if action == "display_name":
+            new_name = request.form.get("display_name", "").strip()
+            if not new_name:
+                flash("Display name cannot be empty.", "error")
+            elif is_env_master:
+                # For .env master, just update the session display name
+                session["admin_display"] = new_name
+                flash("Display name updated.", "success")
+            else:
+                with get_db() as conn:
+                    conn.execute(
+                        "UPDATE admin_users SET display_name=? WHERE id=?",
+                        (new_name, session["admin_id"])
+                    )
+                    conn.commit()
+                session["admin_display"] = new_name
+                flash("Display name updated.", "success")
+
+        elif action == "password":
+            if is_env_master:
+                flash("Your password is set via the .env file on the server. Update ADMIN_PASSWORD there.", "warning")
+            else:
+                current  = request.form.get("current_password", "")
+                new_pw   = request.form.get("new_password", "")
+                confirm  = request.form.get("confirm_password", "")
+                if not current or not new_pw or not confirm:
+                    flash("All password fields are required.", "error")
+                elif new_pw != confirm:
+                    flash("New passwords do not match.", "error")
+                elif len(new_pw) < 6:
+                    flash("Password must be at least 6 characters.", "error")
+                else:
+                    with get_db() as conn:
+                        row = conn.execute(
+                            "SELECT password_hash FROM admin_users WHERE id=?",
+                            (session["admin_id"],)
+                        ).fetchone()
+                        if not row or not check_password_hash(row["password_hash"], current):
+                            flash("Current password is incorrect.", "error")
+                        else:
+                            conn.execute(
+                                "UPDATE admin_users SET password_hash=? WHERE id=?",
+                                (generate_password_hash(new_pw), session["admin_id"])
+                            )
+                            conn.commit()
+                            flash("Password changed successfully.", "success")
+
+        return redirect(url_for("admin_profile"))
+
+    # GET — load current data
+    profile_data = {
+        "username":     session.get("admin_username", "admin"),
+        "display_name": session.get("admin_display") or session.get("admin_username", "admin"),
+        "role":         session.get("admin_role", "consultant"),
+    }
+    if not is_env_master and session.get("admin_id"):
+        with get_db() as conn:
+            row = conn.execute(
+                "SELECT * FROM admin_users WHERE id=?", (session["admin_id"],)
+            ).fetchone()
+            if row:
+                profile_data["username"]     = row["username"]
+                profile_data["display_name"] = row["display_name"] or row["username"]
+                profile_data["created_at"]   = row["created_at"][:10] if row["created_at"] else "—"
+
+    return render_template("admin/profile.html",
+        profile=profile_data,
+        is_env_master=is_env_master,
+        is_master=session.get("admin_role") == "master"
+    )
+
+
 # ─────────────────────────── DASHBOARD ────────────────────────────
 
 @app.route("/admin")
