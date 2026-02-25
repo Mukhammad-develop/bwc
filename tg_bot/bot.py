@@ -111,7 +111,12 @@ SERVICE_KEYWORDS = {
     "paye": [
         "paye", "employed", "employee", "p60", "p45", "payslip", "refund",
         "tax refund", "hmrc", "ni number", "national insurance", "income tax",
-        "ish haqi", "soliq qaytimi", "возврат налога", "ндфл", "работаю",
+        # Uzbek
+        "ish haqi", "soliq qaytimi", "soliq", "p45", "hmrc", "ishchi",
+        "deklaratsiya", "vergi", "qaytim", "ishlayapman", "ishlagan",
+        # Russian
+        "возврат налога", "ндфл", "работаю", "работал", "налог", "возврат",
+        "зарплата", "декларация",
     ],
     "self": [
         "self employed", "self-employed", "freelance", "freelancer",
@@ -147,10 +152,58 @@ SERVICE_INFO = {
                       "Sponsorship letter if family-funded"],
     },
     "paye": {
-        "name": "PAYE Tax Refund",
-        "collect": ["which tax years to claim", "number of employers",
-                    "NI number", "bank details for refund"],
-        "documents": ["P60 (one per year)", "P45 (if changed employer)", "Payslips"],
+        "name": "HMRC Tax Return (PAYE)",
+        # Detailed step-by-step flow overrides the generic collect/documents logic
+        "flow": """\
+You are helping the client complete their HMRC PAYE tax return.
+Collect the following items ONE AT A TIME, strictly in this order.
+Do NOT ask for the next item until the previous one is provided or confirmed.
+
+STEP 1 — P45 file
+  Ask them to send their P45 as a PDF file.
+  Once they send the file, immediately ask:
+    "Is this file password protected?"
+  If YES → ask them to share the password so we can open and process it.
+  If NO  → move on to Step 2.
+
+STEP 2 — Passport
+  Ask for a photo or scan of the photo/ID page of their passport.
+
+STEP 3 — Address outside England
+  Ask for their residential address in their home country
+  (Uzbekistan / Kazakhstan / Kyrgyzstan / Tajikistan).
+
+STEP 4 — National Insurance number
+  Ask for their NI number. If they are unsure where to find it,
+  tell them it's on their payslip or P60, and looks like: AB 12 34 56 C.
+
+STEP 5 — Email and phone number
+  Ask for their email address and their phone number
+  (UK number or home country number — either is fine).
+
+STEP 6 — UK bank details
+  Ask for their UK bank Sort Code (6 digits, format 12-34-56)
+  and Account Number (8 digits). Explain this is where HMRC sends the refund.
+
+STEP 7 — How many times worked in England
+  Ask how many times they have come to work in England
+  (first time ever, or total number of visits/employment periods).
+
+COMPLETION
+  Once all 7 steps are done, give a brief summary of everything collected,
+  then tell them:
+  "The Brightway team will now review everything and get back to you with
+   the exact fee and next steps within 24-48 hours."
+  Do not ask for anything else after this.
+
+IMPORTANT NOTES:
+- If the user sends a document before being asked, acknowledge it and
+  continue from where you are in the flow (do not repeat steps already done).
+- Never ask for more than one thing at a time.
+- If the user asks about fees, say the fee is confirmed after reviewing
+  the documents — competitive pricing for a full HMRC submission.
+- HMRC refunds typically take 4-12 weeks once submitted.
+""",
     },
     "self": {
         "name": "Self-Employed Tax / Self Assessment",
@@ -237,11 +290,25 @@ def build_system_prompt(service: str, lang: str) -> str:
     info = SERVICE_INFO[service]
     lang_map = {
         "en": "English",
-        "uz": "Uzbek (Latin script)",
+        "uz": "Uzbek (Latin script, not Cyrillic)",
         "ru": "Russian",
     }
     reply_lang = lang_map.get(lang, "English")
 
+    # Services with a detailed step-by-step flow
+    if "flow" in info:
+        return f"""You work at Brightway Consulting, a UK firm helping Central Asian workers in England.
+You're in a Telegram chat helping the client with: {info['name']}.
+
+{info['flow']}
+
+{TONE_RULES}
+{ANTI_BOT_PATTERNS}
+{STYLE_EXAMPLES}
+LANGUAGE: Reply ONLY in {reply_lang}. Never switch languages even if the user writes in a different one.
+Keep each message short and focused — one question, one instruction, or one confirmation at a time."""
+
+    # Generic services (student, company, self)
     return f"""You work at Brightway Consulting, a UK firm. You're chatting with a client on Telegram about {info['name']}.
 
 YOUR JOB — gather this info through natural conversation, one thing at a time:
