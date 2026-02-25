@@ -71,6 +71,28 @@
       <h1>{% block page_title %}Admin{% endblock %}</h1>
       <div class="admin-topbar-right">
         {% block topbar_actions %}{% endblock %}
+
+        <!-- Notification bell -->
+        {% if session.admin_id %}
+        <div class="notif-bell-wrap" id="notifWrap">
+          <button class="notif-bell-btn" id="notifBtn" onclick="toggleNotifDropdown()" title="Notifications">
+            🔔
+            {% if unread_notifications > 0 %}
+            <span class="notif-badge" id="notifBadge">{{ unread_notifications }}</span>
+            {% endif %}
+          </button>
+          <div class="notif-dropdown" id="notifDropdown">
+            <div class="notif-dropdown-header">
+              <span>Notifications</span>
+              <a href="{{ url_for('admin_notifications') }}" style="font-size:.75rem;color:#2563eb">See all</a>
+            </div>
+            <div class="notif-dropdown-body" id="notifDropdownBody">
+              <div style="padding:20px;text-align:center;color:#94a3b8;font-size:.8rem">Loading…</div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
       </div>
     </div>
 
@@ -105,5 +127,59 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 {% block extra_js %}{% endblock %}
+
+<script>
+// ── Notification bell dropdown ──────────────────────────────────
+let notifLoaded = false;
+
+function toggleNotifDropdown() {
+  const dd = document.getElementById('notifDropdown');
+  if (!dd) return;
+  const open = dd.classList.toggle('open');
+  if (open && !notifLoaded) {
+    notifLoaded = true;
+    loadNotifPreview();
+  }
+  // Close on outside click
+  if (open) {
+    setTimeout(() => document.addEventListener('click', closeNotifOnOutside, {once: true}), 10);
+  }
+}
+
+function closeNotifOnOutside(e) {
+  const wrap = document.getElementById('notifWrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('notifDropdown').classList.remove('open');
+  }
+}
+
+function loadNotifPreview() {
+  fetch('/admin/notifications/preview')
+    .then(r => r.json())
+    .then(data => {
+      const body = document.getElementById('notifDropdownBody');
+      if (!data.items || data.items.length === 0) {
+        body.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:.8rem">No notifications yet.</div>';
+        return;
+      }
+      body.innerHTML = data.items.map(n => `
+        <div class="notif-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}">
+          <div class="notif-item-title">${escHtml(n.title)}</div>
+          <div class="notif-item-msg">${escHtml(n.message)}</div>
+          <div class="notif-item-time">${n.created_at.substring(0,16).replace('T',' ')}</div>
+        </div>
+      `).join('');
+      // Clear badge
+      const badge = document.getElementById('notifBadge');
+      if (badge) badge.remove();
+      // Mark all read silently
+      fetch('/admin/notifications/mark-preview-read', {method:'POST'});
+    });
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
 </body>
 </html>

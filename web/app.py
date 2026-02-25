@@ -71,6 +71,16 @@ def init_admin_tables():
             ai_conclusion  TEXT,
             created_at     TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS notifications (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            recipient_id INTEGER NOT NULL,
+            title        TEXT NOT NULL,
+            message      TEXT NOT NULL,
+            link         TEXT,
+            is_read      INTEGER DEFAULT 0,
+            created_at   TEXT NOT NULL,
+            FOREIGN KEY(recipient_id) REFERENCES admin_users(id) ON DELETE CASCADE
+        );
         """)
         conn.commit()
         for col, defval in [
@@ -120,6 +130,56 @@ def seed_master_admin():
 
 
 seed_master_admin()
+
+
+# ─────────────────────────── NOTIFICATIONS ────────────────────────
+
+def notify_masters(title, message, link=None, exclude_id=None):
+    """Send a notification to every DB master admin (except the actor themselves)."""
+    now = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        masters = conn.execute(
+            "SELECT id FROM admin_users WHERE role='master'"
+        ).fetchall()
+        for m in masters:
+            if exclude_id and m["id"] == exclude_id:
+                continue
+            conn.execute(
+                "INSERT INTO notifications (recipient_id, title, message, link, created_at) VALUES (?,?,?,?,?)",
+                (m["id"], title, message, link, now)
+            )
+        conn.commit()
+
+
+def notify_user(recipient_id, title, message, link=None):
+    """Send a notification to a specific DB admin user."""
+    now = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO notifications (recipient_id, title, message, link, created_at) VALUES (?,?,?,?,?)",
+            (recipient_id, title, message, link, now)
+        )
+        conn.commit()
+
+
+def get_unread_count():
+    """Return unread notification count for the current session user (0 for env master)."""
+    admin_id = session.get("admin_id")
+    if not admin_id:
+        return 0
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM notifications WHERE recipient_id=? AND is_read=0",
+            (admin_id,)
+        ).fetchone()
+        return row[0] if row else 0
+
+
+@app.context_processor
+def inject_notifications():
+    if session.get("admin_logged_in"):
+        return {"unread_notifications": get_unread_count()}
+    return {"unread_notifications": 0}
 
 
 @app.template_filter("fromjson")
@@ -404,6 +464,84 @@ def contact():
 
 # ─────────────────────────── ADMIN AUTH ───────────────────────────
 
+@app.route("/admin/notifications")
+@login_required
+def admin_notifications():
+    admin_id = session.get("admin_id")
+    if not admin_id:
+        flash("Notifications are not available for the built-in master account.", "warning")
+        return redirect(url_for("admin_dashboard"))
+    with get_db() as conn:
+        notifications = conn.execute(
+            "SELECT * FROM notifications WHERE recipient_id=? ORDER BY created_at DESC LIMIT 50",
+            (admin_id,)
+        ).fetchall()
+        conn.execute(
+            "UPDATE notifications SET is_read=1 WHERE recipient_id=? AND is_read=0",
+            (admin_id,)
+        )
+        conn.commit()
+    return render_template("admin/notifications.html", notifications=notifications)
+
+
+@app.route("/admin/notifications/<int:notif_id>/read", methods=["POST"])
+@login_required
+def admin_notif_read(notif_id):
+    admin_id = session.get("admin_id")
+    if admin_id:
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE notifications SET is_read=1 WHERE id=? AND recipient_id=?",
+                (notif_id, admin_id)
+            )
+            conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.route("/admin/notifications/read-all", methods=["POST"])
+@login_required
+def admin_notif_read_all():
+    admin_id = session.get("admin_id")
+    if admin_id:
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE notifications SET is_read=1 WHERE recipient_id=?",
+                (admin_id,)
+            )
+            conn.commit()
+    return redirect(url_for("admin_notifications"))
+
+
+@app.route("/admin/notifications/preview")
+@login_required
+def admin_notif_preview():
+    """Return 5 latest notifications as JSON for the dropdown."""
+    admin_id = session.get("admin_id")
+    if not admin_id:
+        return jsonify({"items": []})
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM notifications WHERE recipient_id=? ORDER BY created_at DESC LIMIT 5",
+            (admin_id,)
+        ).fetchall()
+    return jsonify({"items": [dict(r) for r in rows]})
+
+
+@app.route("/admin/notifications/mark-preview-read", methods=["POST"])
+@login_required
+def admin_notif_mark_preview_read():
+    """Mark all unread notifications as read (called silently after dropdown opens)."""
+    admin_id = session.get("admin_id")
+    if admin_id:
+        with get_db() as conn:
+            conn.execute(
+                "UPDATE notifications SET is_read=1 WHERE recipient_id=? AND is_read=0",
+                (admin_id,)
+            )
+            conn.commit()
+    return jsonify({"ok": True})
+
+
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
     if session.get("admin_logged_in"):
@@ -458,6 +596,41 @@ def admin_profile():
                     conn.commit()
                 session["admin_display"] = new_name
                 flash("Display name updated.", "success")
+
+        elif action == "username":
+            if is_env_master:
+                flash("The built-in admin username is set via the .env file (ADMIN_USERNAME).", "warning")
+            else:
+                new_username = request.form.get("new_username", "").strip()
+                if not new_username:
+                    flash("Username cannot be empty.", "error")
+                elif len(new_username) < 3:
+                    flash("Username must be at least 3 characters.", "error")
+                elif new_username == session.get("admin_username"):
+                    flash("That is already your current username.", "warning")
+                else:
+                    try:
+                        old_username = session.get("admin_username")
+                        actor_role   = session.get("admin_role")
+                        actor_display = session.get("admin_display") or old_username
+                        actor_id     = session.get("admin_id")
+                        with get_db() as conn:
+                            conn.execute(
+                                "UPDATE admin_users SET username=? WHERE id=?",
+                                (new_username, actor_id)
+                            )
+                            conn.commit()
+                        session["admin_username"] = new_username
+                        flash(f"Username changed to '{new_username}'.", "success")
+                        # Notify all DB masters about the change
+                        notify_masters(
+                            title="Username changed",
+                            message=f"{actor_display} (@{old_username}) changed their username to @{new_username}.",
+                            link=url_for("admin_notifications"),
+                            exclude_id=actor_id if actor_role != "master" else None
+                        )
+                    except sqlite3.IntegrityError:
+                        flash("That username is already taken.", "error")
 
         elif action == "password":
             if is_env_master:

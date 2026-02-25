@@ -1,0 +1,50 @@
+{% extends "admin/base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+
+{% block topbar_actions %}
+{% if notifications %}
+<form method="POST" action="{{ url_for('admin_notif_read_all') }}" style="margin:0">
+  <button class="btn btn-ghost btn-sm">✓ Mark all read</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width:680px;margin:0 auto">
+  <div class="card">
+    <div class="card-header">
+      <h3>🔔 All Notifications</h3>
+      <span style="font-size:.8rem;color:#94a3b8">{{ notifications|length }} notification(s)</span>
+    </div>
+
+    {% if notifications %}
+    <div style="display:flex;flex-direction:column">
+      {% for n in notifications %}
+      <div class="notif-full-item {% if not n.is_read %}unread{% endif %}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">
+          <div>
+            <div class="notif-full-title">
+              {% if not n.is_read %}<span class="notif-dot"></span>{% endif %}
+              {{ n.title }}
+            </div>
+            <div class="notif-full-msg">{{ n.message }}</div>
+          </div>
+          <div class="notif-full-time">{{ n.created_at[:16]|replace('T',' ') }}</div>
+        </div>
+        {% if n.link %}
+        <a href="{{ n.link }}" style="font-size:.75rem;color:#2563eb;margin-top:4px;display:inline-block">View →</a>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:50px">
+      <div class="es-icon">🔔</div>
+      <h3>All clear</h3>
+      <p>No notifications yet. You'll see alerts here when team members change their usernames or other important events happen.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
