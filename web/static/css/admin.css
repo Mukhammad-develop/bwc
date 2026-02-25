@@ -23,6 +23,7 @@
     background: #2563eb; color: #fff;
 }
 .admin-sidebar-brand .role-badge.master { background: #7c3aed; }
+.admin-sidebar-brand .role-badge.admin  { background: #2563eb; }
 
 .admin-nav { flex: 1; padding: 12px 0; }
 .admin-nav a {
@@ -119,6 +120,9 @@ table.admin-table tr:hover td { background: #f8fafc; }
 .badge-self    { background: #f3e8ff; color: #6b21a8; }
 .badge-company { background: #dcfce7; color: #166534; }
 .badge-default { background: #e2e8f0; color: #475569; }
+.admin-role-master     { background: #fef08a; color: #78350f; }
+.admin-role-admin      { background: #bfdbfe; color: #1e3a8a; }
+.admin-role-consultant { background: #e2e8f0; color: #475569; }
 
 .status-badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: .7rem; font-weight: 700; }
 .status-active    { background: #dbeafe; color: #1e40af; }

@@ -1,14 +1,16 @@
 {% extends "admin/base.html" %}
-{% block title %}Consultants{% endblock %}
-{% block page_title %}Consultant Admins{% endblock %}
+{% block title %}Team Management{% endblock %}
+{% block page_title %}Team Management{% endblock %}
 {% block nav_admins %}active{% endblock %}
 
 {% block content %}
 
-<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+<div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start">
 
-  <!-- Admins table -->
+  <!-- Left column -->
   <div>
+
+    <!-- Accounts table -->
     <div class="card">
       <div class="card-header">
         <h2>Admin Accounts</h2>
@@ -32,9 +34,13 @@
               <td style="font-weight:700">{{ a.username }}</td>
               <td>{{ a.display_name or '–' }}</td>
               <td>
-                <span class="badge admin-role-{{ a.role }}">
-                  {% if a.role == 'master' %}🛡️ Master{% else %}👤 Consultant{% endif %}
-                </span>
+                {% if a.role == 'master' %}
+                  <span class="badge admin-role-master">🛡️ Master</span>
+                {% elif a.role == 'admin' %}
+                  <span class="badge admin-role-admin">⚡ Admin</span>
+                {% else %}
+                  <span class="badge admin-role-consultant">👤 Consultant</span>
+                {% endif %}
               </td>
               <td>
                 <span class="badge badge-default">{{ a.assigned_count }}</span>
@@ -43,7 +49,7 @@
               <td>
                 {% if a.role != 'master' %}
                 <form method="POST" action="{{ url_for('admin_delete_admin', admin_id=a.id) }}"
-                      onsubmit="return confirm('Delete admin {{ a.username }}? This will remove all their assignments.')">
+                      onsubmit="return confirm('Delete {{ a.username }}? This will remove all their assignments.')">
                   <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                 </form>
                 {% else %}
@@ -56,8 +62,8 @@
               <td colspan="6">
                 <div class="empty-state" style="padding:30px">
                   <div class="es-icon">🛡️</div>
-                  <h3>No consultants yet</h3>
-                  <p>Add consultant accounts using the form.</p>
+                  <h3>No accounts yet</h3>
+                  <p>Add accounts using the form.</p>
                 </div>
               </td>
             </tr>
@@ -67,7 +73,7 @@
       </div>
     </div>
 
-    <!-- All users + quick assignment -->
+    <!-- User Assignments -->
     <div class="card" style="margin-top:20px">
       <div class="card-header">
         <h2>User Assignments</h2>
@@ -78,7 +84,7 @@
           <thead>
             <tr>
               <th>Telegram ID</th>
-              <th>AI Name</th>
+              <th>Name</th>
               <th>Assigned To</th>
               <th></th>
             </tr>
@@ -88,11 +94,8 @@
             {% set prof = u.extracted_data | fromjson if u.extracted_data else {} %}
             <tr>
               <td style="font-weight:600">@{{ u.tg_id }}</td>
-              <td style="font-size:.8rem;color:#374151">
-                {{ prof.get('full_name') or '–' }}
-              </td>
+              <td style="font-size:.8rem;color:#374151">{{ prof.get('full_name') or '–' }}</td>
               <td style="font-size:.8rem;color:#64748b">
-                {# We'd need per-user assignment list for this — link to profile #}
                 <a href="{{ url_for('admin_user_profile', user_db_id=u.id) }}" style="color:#2563eb;text-decoration:none">Manage →</a>
               </td>
               <td>
@@ -110,10 +113,12 @@
     </div>
   </div>
 
-  <!-- Add admin form -->
+  <!-- Right column -->
   <div>
+
+    <!-- Add account form -->
     <div class="card">
-      <div class="card-header"><h3>➕ Add Admin Account</h3></div>
+      <div class="card-header"><h3>➕ Add Account</h3></div>
       <div class="card-body">
         <form method="POST" action="{{ url_for('admin_add_admin') }}">
           <div class="form-group">
@@ -133,6 +138,7 @@
             <label>Role</label>
             <select name="role">
               <option value="consultant">👤 Consultant</option>
+              <option value="admin">⚡ Admin</option>
               <option value="master">🛡️ Master Admin</option>
             </select>
           </div>
@@ -141,35 +147,48 @@
       </div>
     </div>
 
-    <!-- Role explanation -->
+    <!-- Role reference card -->
     <div class="card" style="margin-top:16px">
-      <div class="card-header"><h3>Role Permissions</h3></div>
-      <div class="card-body">
-        <div style="margin-bottom:14px">
-          <span class="badge admin-role-consultant" style="margin-bottom:6px;display:inline-block">👤 Consultant</span>
-          <ul style="font-size:.8rem;color:#475569;padding-left:18px;line-height:1.8">
-            <li>View assigned users & their cases</li>
-            <li>Read full chat histories</li>
-            <li>View and download uploaded files</li>
-            <li>Cannot update case status</li>
-            <li>Cannot access reports or admin management</li>
-          </ul>
-        </div>
+      <div class="card-header"><h3>📋 Role Permissions</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:16px">
+
         <div>
           <span class="badge admin-role-master" style="margin-bottom:6px;display:inline-block">🛡️ Master Admin</span>
-          <ul style="font-size:.8rem;color:#475569;padding-left:18px;line-height:1.8">
-            <li>Full access to all users & cases</li>
-            <li>Update case and payment statuses</li>
-            <li>Generate AI reports</li>
-            <li>Manage consultant accounts</li>
-            <li>Assign users to consultants</li>
-            <li>Extract AI user profiles</li>
+          <ul style="font-size:.8rem;color:#475569;padding-left:18px;line-height:1.8;margin:0">
+            <li>Full access to everything</li>
+            <li>Create, edit, delete any admin account</li>
+            <li>Manage user assignments</li>
+            <li>Generate & view AI reports</li>
+            <li>Update case & payment statuses</li>
           </ul>
         </div>
+
+        <div>
+          <span class="badge admin-role-admin" style="margin-bottom:6px;display:inline-block">⚡ Admin</span>
+          <ul style="font-size:.8rem;color:#475569;padding-left:18px;line-height:1.8;margin:0">
+            <li>View <strong>all</strong> users, cases & chats</li>
+            <li>View & download all files</li>
+            <li>View & generate AI reports</li>
+            <li>Update case & payment statuses</li>
+            <li><strong>Cannot</strong> manage admin accounts</li>
+          </ul>
+        </div>
+
+        <div>
+          <span class="badge admin-role-consultant" style="margin-bottom:6px;display:inline-block">👤 Consultant</span>
+          <ul style="font-size:.8rem;color:#475569;padding-left:18px;line-height:1.8;margin:0">
+            <li>View only <strong>assigned</strong> users & cases</li>
+            <li>Read chat histories of assigned users</li>
+            <li>View & download files for assigned users</li>
+            <li>Send messages to assigned users</li>
+            <li><strong>Cannot</strong> access reports or admin management</li>
+          </ul>
+        </div>
+
       </div>
     </div>
-  </div>
 
+  </div>
 </div>
 
 {% endblock %}

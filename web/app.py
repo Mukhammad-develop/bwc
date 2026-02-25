@@ -98,6 +98,30 @@ def init_admin_tables():
 init_admin_tables()
 
 
+def seed_master_admin():
+    """Create a DB-backed master admin account on first run if it doesn't exist."""
+    username = os.getenv("MASTER2_USERNAME", "bwmaster")
+    password = os.getenv("MASTER2_PASSWORD", "Brightway2025!")
+    display  = os.getenv("MASTER2_DISPLAY",  "Brightway Master")
+    now      = datetime.utcnow().isoformat()
+    try:
+        with get_db() as conn:
+            existing = conn.execute(
+                "SELECT id FROM admin_users WHERE username=?", (username,)
+            ).fetchone()
+            if not existing:
+                conn.execute(
+                    "INSERT INTO admin_users (username, password_hash, display_name, role, created_at) VALUES (?,?,?,?,?)",
+                    (username, generate_password_hash(password), display, "master", now)
+                )
+                conn.commit()
+    except Exception:
+        pass
+
+
+seed_master_admin()
+
+
 @app.template_filter("fromjson")
 def fromjson_filter(s):
     try:
@@ -154,6 +178,7 @@ def login_required(f):
 
 
 def master_required(f):
+    """Only the hardcoded .env master or DB master-role users."""
     @wraps(f)
     def inner(*a, **kw):
         if not session.get("admin_logged_in"):
@@ -165,8 +190,23 @@ def master_required(f):
     return inner
 
 
+def elevated_required(f):
+    """Master or Admin role — can see all users/cases/reports but NOT manage admins."""
+    @wraps(f)
+    def inner(*a, **kw):
+        if not session.get("admin_logged_in"):
+            return redirect(url_for("admin_login"))
+        if session.get("admin_role") not in ("master", "admin"):
+            flash("Admin access required.", "error")
+            return redirect(url_for("admin_dashboard"))
+        return f(*a, **kw)
+    return inner
+
+
 def can_view_user(user_db_id):
-    if session.get("admin_role") == "master":
+    """Master and Admin can see all users; Consultant only sees assigned users."""
+    role = session.get("admin_role")
+    if role in ("master", "admin"):
         return True
     admin_id = session.get("admin_id")
     if not admin_id:
@@ -176,6 +216,10 @@ def can_view_user(user_db_id):
             "SELECT 1 FROM admin_assignments WHERE admin_id=? AND user_id=?",
             (admin_id, user_db_id)
         ).fetchone())
+
+
+def is_elevated():
+    return session.get("admin_role") in ("master", "admin")
 
 
 # ─────────────────────────── AI HELPERS ───────────────────────────
@@ -475,6 +519,7 @@ def admin_profile():
 @login_required
 def admin_dashboard():
     is_master = session.get("admin_role") == "master"
+    elevated  = is_elevated()
     with get_db() as conn:
         total_users  = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
         total_cases  = conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
@@ -486,14 +531,14 @@ def admin_dashboard():
             SELECT c.id, c.service, c.status, c.payment_status, c.created_at, u.tg_id, u.id as user_db_id
             FROM cases c JOIN users u ON c.user_id=u.id
         """
-        if not is_master:
+        if not elevated:
             admin_id = session.get("admin_id")
             recent_query += f" WHERE u.id IN (SELECT user_id FROM admin_assignments WHERE admin_id={admin_id or 0})"
         recent_query += " ORDER BY c.created_at DESC LIMIT 10"
         recent_cases = conn.execute(recent_query).fetchall()
 
-        # My assigned users (consultant) or all (master)
-        if is_master:
+        # Assigned users count for consultants; all for elevated
+        if elevated:
             my_users_count = total_users
         else:
             my_users_count = conn.execute(
@@ -511,7 +556,7 @@ def admin_dashboard():
         active_cases=active_cases, paid_cases=paid_cases,
         by_service=by_service, recent_cases=recent_cases,
         my_users_count=my_users_count, latest_report=latest_report,
-        is_master=is_master)
+        is_master=is_master, is_elevated=elevated)
 
 
 # ─────────────────────────── CASES ────────────────────────────────
@@ -520,6 +565,7 @@ def admin_dashboard():
 @login_required
 def admin_cases():
     is_master = session.get("admin_role") == "master"
+    elevated  = is_elevated()
     service = request.args.get("service", "")
     status  = request.args.get("status", "")
     payment = request.args.get("payment", "")
@@ -530,7 +576,7 @@ def admin_cases():
         FROM cases c JOIN users u ON c.user_id=u.id WHERE 1=1
     """
     params = []
-    if not is_master:
+    if not elevated:
         admin_id = session.get("admin_id")
         query += f" AND u.id IN (SELECT user_id FROM admin_assignments WHERE admin_id=?)"
         params.append(admin_id)
@@ -546,7 +592,7 @@ def admin_cases():
         cases = conn.execute(query, params).fetchall()
     return render_template("admin/cases.html", cases=cases,
         filter_service=service, filter_status=status, filter_payment=payment,
-        is_master=is_master)
+        is_master=is_master, is_elevated=elevated)
 
 
 @app.route("/admin/cases/<int:case_id>")
@@ -656,8 +702,9 @@ def admin_file_download(file_id):
 @login_required
 def admin_users():
     is_master = session.get("admin_role") == "master"
+    elevated  = is_elevated()
     with get_db() as conn:
-        if is_master:
+        if elevated:
             users = conn.execute("""
                 SELECT u.id, u.tg_id, u.language, u.created_at,
                        COUNT(DISTINCT c.id) case_count,
@@ -683,7 +730,7 @@ def admin_users():
                 LEFT JOIN user_ai_profiles p ON u.id=p.user_id
                 GROUP BY u.id ORDER BY u.created_at DESC
             """, (admin_id,)).fetchall()
-    return render_template("admin/users.html", users=users, is_master=is_master)
+    return render_template("admin/users.html", users=users, is_master=is_master, is_elevated=elevated)
 
 
 @app.route("/admin/users/<int:user_db_id>")
@@ -747,6 +794,7 @@ def admin_user_profile(user_db_id):
         user=user, cases=cases, docs_with_url=docs_with_url,
         profile=profile, profile_updated=profile_row["updated_at"] if profile_row else None,
         is_master=session.get("admin_role")=="master",
+        is_elevated=is_elevated(),
         all_admins=all_admins, assignments=assignments,
         all_docs_by_unique_id=all_docs_by_unique_id,
         all_docs_by_filename=all_docs_by_filename)
@@ -906,20 +954,20 @@ def admin_delete_admin(admin_id):
 # ─────────────────────────── REPORTS ──────────────────────────────
 
 @app.route("/admin/reports")
-@master_required
+@elevated_required
 def admin_reports():
     with get_db() as conn:
         reports = conn.execute(
             "SELECT * FROM ai_reports ORDER BY created_at DESC LIMIT 20"
         ).fetchall()
-    # Always show today's live stats at top
     now = datetime.utcnow()
     today_stats = compute_stats((now - timedelta(days=1)).isoformat(), now.isoformat())
-    return render_template("admin/reports.html", reports=reports, today_stats=today_stats)
+    return render_template("admin/reports.html", reports=reports, today_stats=today_stats,
+                           is_master=session.get("admin_role")=="master")
 
 
 @app.route("/admin/reports/generate/<report_type>", methods=["POST"])
-@master_required
+@elevated_required
 def admin_generate_report(report_type):
     result = generate_report(report_type)
     if result:
@@ -930,7 +978,7 @@ def admin_generate_report(report_type):
 
 
 @app.route("/admin/reports/<int:report_id>")
-@master_required
+@elevated_required
 def admin_report_detail(report_id):
     with get_db() as conn:
         report = conn.execute("SELECT * FROM ai_reports WHERE id=?", (report_id,)).fetchone()

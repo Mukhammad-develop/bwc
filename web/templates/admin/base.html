@@ -29,8 +29,10 @@
   <aside class="admin-sidebar">
     <div class="admin-sidebar-brand">
       <h2>⚡ Brightway Admin</h2>
-      <div class="role-badge {% if session.admin_role == 'master' %}master{% endif %}">
-        {{ session.admin_role|upper if session.admin_role else 'ADMIN' }}
+      <div class="role-badge {% if session.admin_role == 'master' %}master{% elif session.admin_role == 'admin' %}admin{% endif %}">
+        {% if session.admin_role == 'master' %}🛡️ MASTER
+        {% elif session.admin_role == 'admin' %}⚡ ADMIN
+        {% else %}👤 CONSULTANT{% endif %}
       </div>
       <div style="font-size:.75rem;color:#64748b;margin-top:6px">{{ session.admin_display or session.admin_username }}</div>
     </div>
@@ -45,11 +47,13 @@
       <a href="{{ url_for('admin_users') }}" class="{% block nav_users %}{% endblock %}">
         👥 Users
       </a>
-      {% if session.admin_role == 'master' %}
+      {% if session.admin_role in ('master', 'admin') %}
       <div class="nav-sep"></div>
+      {% if session.admin_role == 'master' %}
       <a href="{{ url_for('admin_admins') }}" class="{% block nav_admins %}{% endblock %}">
-        🛡️ Consultants
+        🛡️ Team
       </a>
+      {% endif %}
       <a href="{{ url_for('admin_reports') }}" class="{% block nav_reports %}{% endblock %}">
         📈 Reports
       </a>
