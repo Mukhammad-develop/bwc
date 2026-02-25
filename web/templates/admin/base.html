@@ -76,18 +76,27 @@
         {% if session.admin_id %}
         <div class="notif-bell-wrap" id="notifWrap">
           <button class="notif-bell-btn" id="notifBtn" onclick="toggleNotifDropdown()" title="Notifications">
-            🔔
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
             {% if unread_notifications > 0 %}
-            <span class="notif-badge" id="notifBadge">{{ unread_notifications }}</span>
+            <span class="notif-badge" id="notifBadge">{{ unread_notifications if unread_notifications < 10 else '9+' }}</span>
             {% endif %}
           </button>
           <div class="notif-dropdown" id="notifDropdown">
             <div class="notif-dropdown-header">
-              <span>Notifications</span>
-              <a href="{{ url_for('admin_notifications') }}" style="font-size:.75rem;color:#2563eb">See all</a>
+              <div class="notif-dropdown-title">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                Notifications
+              </div>
+              <a href="{{ url_for('admin_notifications') }}" class="notif-see-all">View all →</a>
             </div>
             <div class="notif-dropdown-body" id="notifDropdownBody">
-              <div style="padding:20px;text-align:center;color:#94a3b8;font-size:.8rem">Loading…</div>
+              <div class="notif-loading">
+                <div class="notif-spinner"></div>
+                <span>Loading…</span>
+              </div>
             </div>
           </div>
         </div>
@@ -129,19 +138,20 @@ document.addEventListener('DOMContentLoaded', () => {
 {% block extra_js %}{% endblock %}
 
 <script>
-// ── Notification bell dropdown ──────────────────────────────────
+// ── Notification bell ─────────────────────────────────────────
 let notifLoaded = false;
 
 function toggleNotifDropdown() {
-  const dd = document.getElementById('notifDropdown');
+  const dd  = document.getElementById('notifDropdown');
+  const btn = document.getElementById('notifBtn');
   if (!dd) return;
   const open = dd.classList.toggle('open');
-  if (open && !notifLoaded) {
-    notifLoaded = true;
-    loadNotifPreview();
-  }
-  // Close on outside click
+  btn.classList.toggle('active', open);
   if (open) {
+    if (!notifLoaded) {
+      notifLoaded = true;
+      loadNotifPreview();
+    }
     setTimeout(() => document.addEventListener('click', closeNotifOnOutside, {once: true}), 10);
   }
 }
@@ -150,31 +160,53 @@ function closeNotifOnOutside(e) {
   const wrap = document.getElementById('notifWrap');
   if (wrap && !wrap.contains(e.target)) {
     document.getElementById('notifDropdown').classList.remove('open');
+    document.getElementById('notifBtn').classList.remove('active');
   }
 }
 
 function loadNotifPreview() {
-  fetch('/admin/notifications/preview')
-    .then(r => r.json())
+  const body = document.getElementById('notifDropdownBody');
+  fetch('/admin/notifications/preview', {credentials: 'same-origin'})
+    .then(r => {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    })
     .then(data => {
-      const body = document.getElementById('notifDropdownBody');
       if (!data.items || data.items.length === 0) {
-        body.innerHTML = '<div style="padding:20px;text-align:center;color:#94a3b8;font-size:.8rem">No notifications yet.</div>';
+        body.innerHTML = `
+          <div class="notif-empty">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            <p>All caught up!</p>
+          </div>`;
         return;
       }
       body.innerHTML = data.items.map(n => `
-        <div class="notif-item ${n.is_read ? '' : 'unread'}" data-id="${n.id}">
-          <div class="notif-item-title">${escHtml(n.title)}</div>
-          <div class="notif-item-msg">${escHtml(n.message)}</div>
-          <div class="notif-item-time">${n.created_at.substring(0,16).replace('T',' ')}</div>
-        </div>
-      `).join('');
-      // Clear badge
+        <div class="notif-item ${n.is_read ? '' : 'unread'}">
+          <div class="notif-item-icon">${n.is_read ? '📋' : '🔵'}</div>
+          <div class="notif-item-body">
+            <div class="notif-item-title">${escHtml(n.title)}</div>
+            <div class="notif-item-msg">${escHtml(n.message)}</div>
+            <div class="notif-item-time">${fmtTime(n.created_at)}</div>
+          </div>
+        </div>`).join('');
       const badge = document.getElementById('notifBadge');
       if (badge) badge.remove();
-      // Mark all read silently
-      fetch('/admin/notifications/mark-preview-read', {method:'POST'});
+      fetch('/admin/notifications/mark-preview-read', {method: 'POST', credentials: 'same-origin'});
+    })
+    .catch(() => {
+      body.innerHTML = '<div class="notif-empty"><p style="color:#ef4444">Could not load notifications.</p></div>';
     });
+}
+
+function fmtTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso.replace(' ', 'T') + (iso.includes('T') ? '' : 'Z'));
+  const now = new Date();
+  const diff = Math.floor((now - d) / 1000);
+  if (diff < 60)  return 'Just now';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return iso.substring(0,10);
 }
 
 function escHtml(s) {
