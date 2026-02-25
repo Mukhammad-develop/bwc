@@ -356,7 +356,11 @@ def ask_ai(conversation: list, service: str, lang: str) -> str:
         client = OpenAI(api_key=OPENAI_API_KEY)
         messages = [{"role": "system", "content": build_system_prompt(service, lang)}]
         for msg in conversation[-20:]:
-            messages.append({"role": msg["role"], "content": msg["content"]})
+            # Map any non-standard roles to valid OpenAI roles
+            role = msg["role"]
+            if role not in ("user", "assistant", "system"):
+                role = "assistant"
+            messages.append({"role": role, "content": msg["content"]})
         print(f"[AI] {service} | {len(conversation)} msgs | lang={lang}")
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
