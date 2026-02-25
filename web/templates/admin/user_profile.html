@@ -149,21 +149,24 @@
       <button class="tab-btn" onclick="switchTab('tab-files', this)">📎 Files ({{ docs_with_url|length }})</button>
     </div>
 
-    <!-- Chats tab — one unified timeline -->
+    <!-- Chats tab — live unified timeline -->
     <div class="tab-pane active" id="tab-chats">
-      {% set has_any_msg = [] %}
-      {% for case in cases %}{% if case.conversation_history | fromjson %}{% set _ = has_any_msg.append(1) %}{% endif %}{% endfor %}
+      <div class="chat-wrap">
 
-      {% if has_any_msg %}
-      <div class="chat-wrap" style="max-height:700px;display:flex;flex-direction:column">
-        <div class="chat-messages" id="unifiedChat" style="flex:1;overflow-y:auto">
+        <!-- Live status bar -->
+        <div class="chat-live-bar">
+          <span class="chat-live-dot" id="liveDot"></span>
+          <span id="liveStatus">Connecting…</span>
+          <span id="liveNewBadge" class="chat-new-badge" style="display:none">New message ↓</span>
+        </div>
+
+        <!-- Messages -->
+        <div class="chat-messages" id="unifiedChat">
           {% for case in cases %}
           {% set conv = case.conversation_history | fromjson %}
-          {% if conv %}
-
           {% for msg in conv %}
           {% set parsed = msg.content | parse_file_tag %}
-          <div class="chat-msg {{ msg.role }}">
+          <div class="chat-msg {{ msg.role }}" data-ts="{{ msg.timestamp or '' }}">
             <div class="msg-avatar">{% if msg.role=='user' %}👤{% elif msg.role=='admin' %}🛡️{% else %}🤖{% endif %}</div>
             <div style="max-width:100%">
               {% if parsed.is_file %}
@@ -206,36 +209,41 @@
               {% else %}
                 <div class="msg-bubble markdown-body">{{ msg.content }}</div>
               {% endif %}
-                  <div class="msg-meta">
-                    {% if msg.role=='admin' %}🛡️ {{ msg.sender if msg.sender is defined else 'Admin' }}{% else %}{{ msg.role|title }}{% endif %}
-                    {% if msg.timestamp %} · {{ msg.timestamp[:16]|replace('T',' ') }}{% endif %}
-                  </div>
+              <div class="msg-meta">
+                {% if msg.role=='admin' %}🛡️ {{ msg.sender if msg.sender is defined else 'Admin' }}{% else %}{{ msg.role|title }}{% endif %}
+                {% if msg.timestamp %} · {{ msg.timestamp[:16]|replace('T',' ') }}{% endif %}
+              </div>
             </div>
           </div>
           {% endfor %}
-
-          {% endif %}
           {% endfor %}
+
+          {% set total_msgs = [] %}
+          {% for case in cases %}{% for m in case.conversation_history | fromjson %}{% set _ = total_msgs.append(1) %}{% endfor %}{% endfor %}
+          {% if not total_msgs %}
+          <div class="chat-empty" id="chatEmpty">
+            <span>No messages yet. Send the first one below.</span>
+          </div>
+          {% endif %}
         </div>
 
-        <!-- Admin reply bar -->
+        <!-- Typing indicator (shown while AI is responding) -->
+        <div class="chat-typing" id="chatTyping" style="display:none">
+          <span></span><span></span><span></span>
+        </div>
+
+        <!-- Reply bar -->
         <div class="admin-reply-bar">
-          <input type="text" id="adminMsgInput" placeholder="Write a message to this user…" autocomplete="off">
-          <button id="adminSendBtn" onclick="adminSendMessage()">Send ↑</button>
+          <textarea id="adminMsgInput"
+                    placeholder="Write a message…"
+                    rows="1"
+                    autocomplete="off"></textarea>
+          <button id="adminSendBtn" onclick="adminSendMessage()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
         </div>
+
       </div>
-      {% else %}
-        <!-- No history yet but still show the reply bar -->
-        <div class="chat-wrap" style="display:flex;flex-direction:column;min-height:120px">
-          <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:20px;color:#94a3b8;font-size:.85rem">
-            No messages yet — send the first one below.
-          </div>
-          <div class="admin-reply-bar">
-            <input type="text" id="adminMsgInput" placeholder="Write a message to this user…" autocomplete="off">
-            <button id="adminSendBtn" onclick="adminSendMessage()">Send ↑</button>
-          </div>
-        </div>
-      {% endif %}
     </div>
 
     <!-- Files tab -->
@@ -297,63 +305,178 @@
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  const chat = document.getElementById('unifiedChat');
-  if (chat) chat.scrollTop = chat.scrollHeight;
+const USER_ID    = {{ user.id }};
+const POLL_URL   = '{{ url_for("admin_poll_messages", user_db_id=user.id) }}';
+const SEND_URL   = '{{ url_for("admin_send_message",  user_db_id=user.id) }}';
 
-  // Send on Enter key
+// Track the latest timestamp we've seen so we only fetch newer messages
+let lastTs = '';
+let pollTimer = null;
+let userScrolledUp = false;
+
+// ── Init ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const chat  = document.getElementById('unifiedChat');
   const input = document.getElementById('adminMsgInput');
-  if (input) input.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); adminSendMessage(); }
+
+  // Grab the latest timestamp already rendered on the page
+  document.querySelectorAll('[data-ts]').forEach(el => {
+    const ts = el.getAttribute('data-ts');
+    if (ts && ts > lastTs) lastTs = ts;
   });
+
+  // Scroll to bottom on load
+  scrollToBottom(true);
+
+  // Auto-resize textarea
+  if (input) {
+    input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+    });
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); adminSendMessage(); }
+    });
+  }
+
+  // Track if user scrolled up (don't force-scroll if they did)
+  if (chat) {
+    chat.addEventListener('scroll', () => {
+      userScrolledUp = chat.scrollTop < chat.scrollHeight - chat.clientHeight - 60;
+    });
+  }
+
+  // "New message" badge click → scroll down
+  document.getElementById('liveNewBadge')?.addEventListener('click', () => {
+    scrollToBottom(true);
+    document.getElementById('liveNewBadge').style.display = 'none';
+  });
+
+  // Start polling
+  startPolling();
 });
 
+// ── Polling ────────────────────────────────────────────────────────────────
+function startPolling() {
+  poll();
+}
+
+async function poll() {
+  const dot    = document.getElementById('liveDot');
+  const status = document.getElementById('liveStatus');
+  try {
+    const url = POLL_URL + (lastTs ? '?since=' + encodeURIComponent(lastTs) : '');
+    const res  = await fetch(url, { credentials: 'same-origin' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    dot.classList.add('online');
+    status.textContent = 'Live';
+
+    if (data.messages && data.messages.length > 0) {
+      // Remove empty-state placeholder
+      document.getElementById('chatEmpty')?.remove();
+
+      data.messages.forEach(msg => {
+        if (!msg.content || msg.content.startsWith('[FILE:')) return; // skip raw file tags for now
+        appendBubble(msg);
+        if (msg.timestamp > lastTs) lastTs = msg.timestamp;
+      });
+
+      if (userScrolledUp) {
+        document.getElementById('liveNewBadge').style.display = 'inline-flex';
+      } else {
+        scrollToBottom();
+      }
+    }
+  } catch(e) {
+    dot.classList.remove('online');
+    status.textContent = 'Reconnecting…';
+  }
+  // Poll every 3 seconds
+  pollTimer = setTimeout(poll, 3000);
+}
+
+// ── Append a message bubble dynamically ───────────────────────────────────
+function appendBubble(msg, opts = {}) {
+  const chat  = document.getElementById('unifiedChat');
+  if (!chat) return;
+
+  const role   = msg.role || 'user';
+  const avatar = role === 'user' ? '👤' : role === 'admin' ? '🛡️' : '🤖';
+  const metaName = role === 'admin'
+    ? `🛡️ ${escHtml(msg.sender || 'Admin')}`
+    : role.charAt(0).toUpperCase() + role.slice(1);
+  const metaTime = msg.timestamp ? ' · ' + msg.timestamp.substring(0,16).replace('T',' ') : '';
+  const tgNote   = opts.tgSent !== undefined
+    ? (opts.tgSent ? ' · <span style="color:#22c55e">✓ sent</span>' : ' · <span style="color:#f59e0b">⚠ not delivered</span>')
+    : '';
+
+  const el = document.createElement('div');
+  el.className = `chat-msg ${role}`;
+  el.setAttribute('data-ts', msg.timestamp || '');
+  el.innerHTML = `
+    <div class="msg-avatar">${avatar}</div>
+    <div style="max-width:100%">
+      <div class="msg-bubble markdown-body">${escHtml(msg.content)}</div>
+      <div class="msg-meta">${metaName}${metaTime}${tgNote}</div>
+    </div>`;
+
+  // Render markdown
+  if (typeof marked !== 'undefined') {
+    const bubble = el.querySelector('.msg-bubble');
+    if (bubble) bubble.innerHTML = marked.parse(msg.content);
+  }
+
+  chat.appendChild(el);
+}
+
+// ── Send ───────────────────────────────────────────────────────────────────
 async function adminSendMessage() {
   const input = document.getElementById('adminMsgInput');
   const btn   = document.getElementById('adminSendBtn');
   const text  = (input.value || '').trim();
   if (!text) return;
 
+  // Optimistic UI: show bubble immediately
+  const tempTs = new Date().toISOString().substring(0,16).replace('T',' ');
+  appendBubble({ role:'admin', content: text, timestamp: tempTs, sender: '{{ session.admin_display or session.admin_username }}' });
+  scrollToBottom();
+
+  input.value = '';
+  input.style.height = 'auto';
   btn.disabled = true;
-  btn.textContent = '…';
 
   try {
-    const res  = await fetch('{{ url_for("admin_send_message", user_db_id=user.id) }}', {
+    const res  = await fetch(SEND_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),
     });
     const data = await res.json();
 
-    if (data.ok) {
-      input.value = '';
-      // Append bubble to chat immediately
-      const chat = document.getElementById('unifiedChat');
-      if (chat) {
-        const bubble = document.createElement('div');
-        bubble.className = 'chat-msg admin';
-        bubble.innerHTML = `
-          <div style="max-width:100%">
-            <div class="msg-bubble">${escapeHtml(text)}</div>
-            <div class="msg-meta">🛡️ ${data.sender} · ${data.timestamp}${data.tg_sent ? ' · ✓ sent' : ' · ⚠ not delivered'}</div>
-          </div>
-          <div class="msg-avatar">🛡️</div>`;
-        chat.appendChild(bubble);
-        chat.scrollTop = chat.scrollHeight;
-      }
-    } else {
+    if (!data.ok) {
       alert(data.error || 'Failed to send.');
     }
+    // The real message will arrive via polling with the correct timestamp
   } catch(e) {
     alert('Network error — could not send.');
   }
 
   btn.disabled = false;
-  btn.textContent = 'Send ↑';
 }
 
-function escapeHtml(t) {
-  return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// ── Utilities ─────────────────────────────────────────────────────────────
+function scrollToBottom(force = false) {
+  const chat = document.getElementById('unifiedChat');
+  if (!chat) return;
+  if (force || !userScrolledUp) {
+    chat.scrollTop = chat.scrollHeight;
+  }
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 </script>
 {% endblock %}

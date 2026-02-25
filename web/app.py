@@ -1044,6 +1044,42 @@ def admin_send_message(user_db_id):
     return jsonify({"ok": True, "tg_sent": tg_ok, "timestamp": ts[:16].replace("T", " "), "sender": admin_name})
 
 
+@app.route("/admin/users/<int:user_db_id>/poll")
+@login_required
+def admin_poll_messages(user_db_id):
+    """Return all messages newer than ?since=<ISO timestamp>."""
+    if not can_view_user(user_db_id):
+        return jsonify({"error": "Access denied"}), 403
+
+    since = request.args.get("since", "")  # ISO string, may be empty
+
+    with get_db() as conn:
+        cases = conn.execute(
+            "SELECT * FROM cases WHERE user_id=? ORDER BY created_at ASC", (user_db_id,)
+        ).fetchall()
+
+    new_msgs = []
+    for case in cases:
+        try:
+            conv = json.loads(case["conversation_history"] or "[]")
+        except Exception:
+            continue
+        for msg in conv:
+            ts = msg.get("timestamp", "")
+            if not since or ts > since:
+                new_msgs.append({
+                    "role":      msg.get("role", "user"),
+                    "content":   msg.get("content", ""),
+                    "timestamp": ts,
+                    "sender":    msg.get("sender", ""),
+                    "case_id":   case["id"],
+                })
+
+    # Sort by timestamp
+    new_msgs.sort(key=lambda m: m["timestamp"])
+    return jsonify({"messages": new_msgs})
+
+
 @app.route("/admin/users/<int:user_db_id>/extract-profile", methods=["POST"])
 @login_required
 def admin_extract_profile(user_db_id):

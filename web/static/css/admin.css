@@ -329,23 +329,67 @@ table.admin-table tr:hover td { background: #f8fafc; }
 .chat-msg.assistant .msg-meta  { text-align: right; }
 .chat-msg.admin .msg-meta      { text-align: right; }
 
+/* ── Chat wrap (overrides) ── */
+.chat-wrap { max-height: 720px; }
+.chat-messages { padding: 16px 14px; gap: 4px; scroll-behavior: smooth; min-height: 200px; }
+
+/* Live status bar */
+.chat-live-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 14px; background: #fff; border-bottom: 1px solid #e2e8f0;
+    font-size: .72rem; color: #94a3b8; flex-shrink: 0;
+}
+.chat-live-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #d1d5db; flex-shrink: 0;
+    transition: background .4s;
+}
+.chat-live-dot.online { background: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.25); }
+.chat-new-badge {
+    margin-left: auto; background: #6366f1; color: #fff; padding: 2px 10px;
+    border-radius: 99px; cursor: pointer; font-weight: 600; font-size: .7rem;
+    display: inline-flex; align-items: center; gap: 4px;
+}
+.chat-empty {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    padding: 40px; color: #94a3b8; font-size: .85rem;
+}
+
+/* Typing indicator */
+.chat-typing {
+    display: flex; align-items: center; gap: 4px;
+    padding: 8px 18px; flex-shrink: 0;
+}
+.chat-typing span {
+    width: 7px; height: 7px; border-radius: 50%; background: #a5b4fc;
+    animation: bounce 1.2s infinite ease-in-out;
+}
+.chat-typing span:nth-child(2) { animation-delay: .2s; }
+.chat-typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes bounce {
+    0%,60%,100% { transform: translateY(0); }
+    30%         { transform: translateY(-6px); }
+}
+
 /* Admin reply bar */
 .admin-reply-bar {
-    display: flex; gap: 8px; padding: 10px 14px;
+    display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px;
     border-top: 1px solid #e2e8f0; background: #fff; flex-shrink: 0;
 }
-.admin-reply-bar input {
+.admin-reply-bar textarea {
     flex: 1; padding: 9px 14px; border: 1px solid #e2e8f0; border-radius: 20px;
-    font-size: .875rem; outline: none; transition: border .2s;
+    font-size: .875rem; outline: none; transition: border .2s; resize: none;
+    font-family: inherit; line-height: 1.4; min-height: 38px; max-height: 120px;
+    overflow-y: auto;
 }
-.admin-reply-bar input:focus { border-color: #6366f1; }
+.admin-reply-bar textarea:focus { border-color: #6366f1; }
 .admin-reply-bar button {
-    padding: 9px 18px; background: #6366f1; color: #fff; border: none;
-    border-radius: 20px; font-size: .875rem; font-weight: 600;
-    cursor: pointer; transition: background .2s; white-space: nowrap;
+    width: 38px; height: 38px; background: #6366f1; color: #fff; border: none;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background .2s, transform .1s; flex-shrink: 0;
 }
-.admin-reply-bar button:hover { background: #4f46e5; }
-.admin-reply-bar button:disabled { background: #a5b4fc; cursor: not-allowed; }
+.admin-reply-bar button:hover   { background: #4f46e5; transform: scale(1.08); }
+.admin-reply-bar button:active  { transform: scale(.95); }
+.admin-reply-bar button:disabled { background: #a5b4fc; cursor: not-allowed; transform: none; }
 
 
 /* Markdown inside bubbles */
