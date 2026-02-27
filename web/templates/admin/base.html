@@ -230,28 +230,29 @@ function toggleSidebar() {
   const wrap = document.querySelector('.admin-wrap');
   const collapsed = wrap.classList.toggle('sidebar-collapsed');
   localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
-  updateBackdrop(collapsed);
+  updateBackdrop(!collapsed); // show backdrop when sidebar is OPEN (not collapsed)
 }
 
 function closeSidebar() {
   const wrap = document.querySelector('.admin-wrap');
-  wrap.classList.remove('sidebar-collapsed');
-  localStorage.setItem(SIDEBAR_KEY, '0');
+  wrap.classList.add('sidebar-collapsed');
+  localStorage.setItem(SIDEBAR_KEY, '1');
   updateBackdrop(false);
 }
 
 function updateBackdrop(show) {
-  // Backdrop only makes sense on mobile where sidebar overlays content
-  if (window.innerWidth > 768) return;
   const bd = document.getElementById('sidebarBackdrop');
   if (bd) bd.classList.toggle('visible', show);
 }
 
-// Restore state on load
+// Default: sidebar collapsed (hidden). Open it with the hamburger.
+// Restore saved preference on load.
 document.addEventListener('DOMContentLoaded', () => {
-  if (localStorage.getItem(SIDEBAR_KEY) === '1') {
+  const saved = localStorage.getItem(SIDEBAR_KEY);
+  // If user never set a preference, or last state was collapsed → keep collapsed
+  if (saved !== '0') {
     document.querySelector('.admin-wrap').classList.add('sidebar-collapsed');
-    updateBackdrop(true);
+    // No backdrop on initial load
   }
 });
 </script>

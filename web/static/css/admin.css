@@ -55,12 +55,19 @@
   color: var(--text-body);
 }
 
-/* ── Sidebar ── */
+/* ── Sidebar — fixed drawer that slides in/out ── */
 .admin-sidebar {
   width: 232px; flex-shrink: 0;
   background: var(--sidebar-bg); color: var(--sidebar-text);
   display: flex; flex-direction: column;
-  position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  /* Fixed so it overlays content and can slide fully off-screen */
+  position: fixed; top: 0; left: 0; height: 100vh;
+  overflow-y: auto; overflow-x: hidden;
+  z-index: 40;
+  transform: translateX(0);
+  transition: transform .24s cubic-bezier(.4,0,.2,1);
+  will-change: transform;
+  box-shadow: 2px 0 12px rgba(0,0,0,.18);
 }
 
 .admin-sidebar-brand {
@@ -100,33 +107,23 @@
 .admin-nav a.logout { color: #f87171; }
 .admin-nav a.logout:hover { background: rgba(248,65,65,.12); color: #fca5a5; }
 
-/* ── Sidebar slide transition ── */
-.admin-sidebar {
-  transition: width .22s cubic-bezier(.4,0,.2,1),
-              transform .22s cubic-bezier(.4,0,.2,1);
-  will-change: width;
-  overflow: hidden;
-}
-
-/* Collapsed state — sidebar shrinks to 0 */
+/* Collapsed — slide fully off to the left */
 .admin-wrap.sidebar-collapsed .admin-sidebar {
-  width: 0;
+  transform: translateX(-100%);
 }
 
-/* Backdrop — only used on mobile where sidebar overlays content */
+/* Backdrop — dims the page behind the open sidebar */
 .sidebar-backdrop {
   display: none;
   position: fixed; inset: 0; z-index: 39;
-  background: rgba(15, 23, 42, .35);
+  background: rgba(15, 23, 42, .3);
   backdrop-filter: blur(1px);
-  animation: fadeIn .18s ease;
+}
+.sidebar-backdrop.visible {
+  display: block;
+  animation: fadeIn .2s ease forwards;
 }
 @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
-
-/* On mobile the sidebar is a fixed drawer — backdrop is needed there */
-@media (max-width: 768px) {
-  .sidebar-backdrop.visible { display: block; }
-}
 
 /* ── Hamburger button ── */
 .sidebar-toggle {
@@ -144,19 +141,28 @@
   transform-origin: center;
 }
 
-/* Animate hamburger → X when collapsed */
-.sidebar-collapsed .sidebar-toggle span:nth-child(1) {
+/* Animate hamburger → X when sidebar is OPEN (not collapsed) */
+.admin-wrap:not(.sidebar-collapsed) .sidebar-toggle span:nth-child(1) {
   transform: translateY(6.5px) rotate(45deg);
 }
-.sidebar-collapsed .sidebar-toggle span:nth-child(2) {
+.admin-wrap:not(.sidebar-collapsed) .sidebar-toggle span:nth-child(2) {
   opacity: 0; transform: scaleX(0);
 }
-.sidebar-collapsed .sidebar-toggle span:nth-child(3) {
+.admin-wrap:not(.sidebar-collapsed) .sidebar-toggle span:nth-child(3) {
   transform: translateY(-6.5px) rotate(-45deg);
 }
 
 /* ── Main ── */
-.admin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.admin-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  /* Push content right so it doesn't hide behind the fixed sidebar */
+  margin-left: 232px;
+  transition: margin-left .24s cubic-bezier(.4,0,.2,1);
+}
+/* When sidebar is collapsed, reclaim the full width */
+.admin-wrap.sidebar-collapsed .admin-main {
+  margin-left: 0;
+}
 
 .admin-topbar {
   background: var(--bg-card); border-bottom: 1px solid var(--border);
