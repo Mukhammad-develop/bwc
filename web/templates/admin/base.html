@@ -27,6 +27,7 @@
 
   <!-- Sidebar -->
   <aside class="admin-sidebar">
+  <div class="admin-sidebar-inner">
     <div class="admin-sidebar-brand">
       <h2>Brightway Admin</h2>
       <div class="role-badge {% if session.admin_role == 'master' %}master{% elif session.admin_role == 'admin' %}admin{% else %}consultant{% endif %}">
@@ -77,6 +78,7 @@
         Sign out
       </a>
     </nav>
+  </div><!-- /.admin-sidebar-inner -->
   </aside>
 
   <!-- Sidebar backdrop (mobile / collapsed) -->

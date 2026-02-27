@@ -57,13 +57,21 @@
 
 /* ── Sidebar ── */
 .admin-sidebar {
-  width: 232px; flex-shrink: 0;
+  width: 232px; min-width: 232px; flex-shrink: 0;
   background: var(--sidebar-bg); color: var(--sidebar-text);
   display: flex; flex-direction: column;
   position: sticky; top: 0; height: 100vh;
-  overflow-y: auto; overflow-x: hidden;
-  transition: width .22s cubic-bezier(.4,0,.2,1);
+  /* overflow MUST be hidden on both axes so content vanishes when width→0 */
+  overflow: hidden;
+  transition: width .22s cubic-bezier(.4,0,.2,1),
+              min-width .22s cubic-bezier(.4,0,.2,1);
   will-change: width;
+}
+/* Inner wrapper handles the actual scroll so overflow:hidden on sidebar works */
+.admin-sidebar-inner {
+  width: 232px; min-width: 232px;
+  display: flex; flex-direction: column; flex: 1;
+  overflow-y: auto;
 }
 
 .admin-sidebar-brand {
@@ -103,7 +111,8 @@
 .admin-nav a.logout { color: #f87171; }
 .admin-nav a.logout:hover { background: rgba(248,65,65,.12); color: #fca5a5; }
 
-/* Collapsed — sidebar shrinks to zero, content fills the space */
+/* Collapsed — sidebar shrinks to zero, inner content stays 232px wide
+   but is clipped by the outer overflow:hidden wrapper */
 .admin-wrap.sidebar-collapsed .admin-sidebar {
   width: 0;
   min-width: 0;
