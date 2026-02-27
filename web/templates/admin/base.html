@@ -241,6 +241,8 @@ function closeSidebar() {
 }
 
 function updateBackdrop(show) {
+  // Backdrop only makes sense on mobile where sidebar overlays content
+  if (window.innerWidth > 768) return;
   const bd = document.getElementById('sidebarBackdrop');
   if (bd) bd.classList.toggle('visible', show);
 }
