@@ -8,32 +8,20 @@
 <!-- Stats -->
 <div class="stats-grid">
   <div class="stat-card highlight">
-    <div class="stat-icon">👥</div>
-    <div class="stat-info">
-      <h3>{% if is_master %}Total Users{% else %}My Users{% endif %}</h3>
-      <p class="stat-number">{{ my_users_count }}</p>
-    </div>
+    <div class="stat-label">{% if is_master %}Total Users{% else %}My Users{% endif %}</div>
+    <div class="stat-number">{{ my_users_count }}</div>
   </div>
   <div class="stat-card">
-    <div class="stat-icon">📋</div>
-    <div class="stat-info">
-      <h3>Total Cases</h3>
-      <p class="stat-number">{{ total_cases }}</p>
-    </div>
+    <div class="stat-label">Total Cases</div>
+    <div class="stat-number">{{ total_cases }}</div>
   </div>
   <div class="stat-card">
-    <div class="stat-icon">🔄</div>
-    <div class="stat-info">
-      <h3>Active</h3>
-      <p class="stat-number">{{ active_cases }}</p>
-    </div>
+    <div class="stat-label">Active</div>
+    <div class="stat-number">{{ active_cases }}</div>
   </div>
   <div class="stat-card success">
-    <div class="stat-icon">💰</div>
-    <div class="stat-info">
-      <h3>Paid</h3>
-      <p class="stat-number">{{ paid_cases }}</p>
-    </div>
+    <div class="stat-label">Paid</div>
+    <div class="stat-number">{{ paid_cases }}</div>
   </div>
 </div>
 
@@ -58,10 +46,10 @@
             <td style="color:#94a3b8">#{{ c.id }}</td>
             <td>
               <span class="badge badge-{{ c.service }}">
-                {% if c.service=='student' %}🎓 Student
-                {% elif c.service=='paye' %}💷 PAYE
-                {% elif c.service=='self' %}🧾 Self-Emp
-                {% elif c.service=='company' %}🏢 Company
+                {% if c.service=='student' %}Student
+                {% elif c.service=='paye' %}PAYE
+                {% elif c.service=='self' %}Self-Emp
+                {% elif c.service=='company' %}Company
                 {% else %}{{ c.service }}{% endif %}
               </span>
             </td>
@@ -97,8 +85,7 @@
           {% set pct = (s.cnt / max_cnt.v * 100)|int %}
           <div class="bar-row">
             <div class="bar-label">
-              {% if s.service=='student' %}🎓{% elif s.service=='paye' %}💷{% elif s.service=='self' %}🧾{% elif s.service=='company' %}🏢{% else %}📄{% endif %}
-              {{ s.service|title }}
+                {{ s.service|title }}
             </div>
             <div class="bar-track">
               <div class="bar-fill fill-{{ s.service }}" style="width:{{ pct }}%"></div>

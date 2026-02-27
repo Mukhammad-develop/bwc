@@ -54,7 +54,7 @@
           <td style="font-size:.75rem;color:#94a3b8">{{ u.created_at[:10] if u.created_at else '–' }}</td>
           <td>
             <a href="{{ url_for('admin_user_profile', user_db_id=u.id) }}" class="btn btn-primary btn-sm">
-              👤 Profile
+              View Profile
             </a>
           </td>
         </tr>
@@ -62,7 +62,7 @@
         <tr>
           <td colspan="9">
             <div class="empty-state" style="padding:40px">
-              <div class="es-icon">👥</div>
+              <div class="es-icon" style="font-size:2rem;opacity:.3">—</div>
               <h3>No users yet</h3>
               <p>Users will appear here after they start the Telegram bot.</p>
             </div>

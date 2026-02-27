@@ -28,40 +28,54 @@
   <!-- Sidebar -->
   <aside class="admin-sidebar">
     <div class="admin-sidebar-brand">
-      <h2>⚡ Brightway Admin</h2>
-      <div class="role-badge {% if session.admin_role == 'master' %}master{% elif session.admin_role == 'admin' %}admin{% endif %}">
-        {% if session.admin_role == 'master' %}🛡️ MASTER
-        {% elif session.admin_role == 'admin' %}⚡ ADMIN
-        {% else %}👤 CONSULTANT{% endif %}
+      <h2>Brightway Admin</h2>
+      <div class="role-badge {% if session.admin_role == 'master' %}master{% elif session.admin_role == 'admin' %}admin{% else %}consultant{% endif %}">
+        {% if session.admin_role == 'master' %}Master
+        {% elif session.admin_role == 'admin' %}Admin
+        {% else %}Consultant{% endif %}
       </div>
-      <div style="font-size:.75rem;color:#64748b;margin-top:6px">{{ session.admin_display or session.admin_username }}</div>
+      <div style="font-size:.72rem;color:var(--sidebar-text);margin-top:6px;opacity:.7">{{ session.admin_display or session.admin_username }}</div>
     </div>
 
     <nav class="admin-nav">
       <a href="{{ url_for('admin_dashboard') }}" class="{% block nav_dashboard %}{% endblock %}">
-        📊 Dashboard
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
       </a>
       <a href="{{ url_for('admin_cases') }}" class="{% block nav_cases %}{% endblock %}">
-        📋 Cases
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+        Cases
       </a>
       <a href="{{ url_for('admin_users') }}" class="{% block nav_users %}{% endblock %}">
-        👥 Users
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Users
       </a>
       {% if session.admin_role in ('master', 'admin') %}
       <div class="nav-sep"></div>
       {% if session.admin_role == 'master' %}
       <a href="{{ url_for('admin_admins') }}" class="{% block nav_admins %}{% endblock %}">
-        🛡️ Team
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        Team
       </a>
       {% endif %}
       <a href="{{ url_for('admin_reports') }}" class="{% block nav_reports %}{% endblock %}">
-        📈 Reports
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Reports
       </a>
       {% endif %}
       <div class="nav-sep"></div>
-      <a href="{{ url_for('index') }}" target="_blank">🌐 Website</a>
-      <a href="{{ url_for('admin_profile') }}" class="{% block nav_profile %}{% endblock %}">👤 My Profile</a>
-      <a href="{{ url_for('admin_logout') }}" class="logout">🚪 Logout</a>
+      <a href="{{ url_for('index') }}" target="_blank">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Website
+      </a>
+      <a href="{{ url_for('admin_profile') }}" class="{% block nav_profile %}{% endblock %}">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        My Profile
+      </a>
+      <a href="{{ url_for('admin_logout') }}" class="logout">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Sign out
+      </a>
     </nav>
   </aside>
 

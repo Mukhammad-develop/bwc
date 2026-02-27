@@ -45,11 +45,11 @@
           <td style="color:#94a3b8">#{{ c.id }}</td>
           <td>
             <span class="badge badge-{{ c.service }}">
-              {% if c.service=='student' %}🎓 Student
-              {% elif c.service=='paye' %}💷 PAYE
-              {% elif c.service=='self' %}🧾 Self-Emp
-              {% elif c.service=='company' %}🏢 Company
-              {% else %}📄 {{ c.service }}{% endif %}
+              {% if c.service=='student' %}Student
+              {% elif c.service=='paye' %}PAYE
+              {% elif c.service=='self' %}Self-Emp
+              {% elif c.service=='company' %}Company
+              {% else %}{{ c.service }}{% endif %}
             </span>
           </td>
           <td>
