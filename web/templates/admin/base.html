@@ -230,19 +230,13 @@ function toggleSidebar() {
   const wrap = document.querySelector('.admin-wrap');
   const collapsed = wrap.classList.toggle('sidebar-collapsed');
   localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
-  updateBackdrop(!collapsed); // show backdrop when sidebar is OPEN (not collapsed)
 }
 
 function closeSidebar() {
+  /* backdrop click — no-op in push mode but kept for safety */
   const wrap = document.querySelector('.admin-wrap');
   wrap.classList.add('sidebar-collapsed');
   localStorage.setItem(SIDEBAR_KEY, '1');
-  updateBackdrop(false);
-}
-
-function updateBackdrop(show) {
-  const bd = document.getElementById('sidebarBackdrop');
-  if (bd) bd.classList.toggle('visible', show);
 }
 
 // Default: sidebar collapsed (hidden). Open it with the hamburger.
