@@ -57,20 +57,22 @@
 
 /* ── Sidebar ── */
 .admin-sidebar {
-  width: 232px; min-width: 232px; flex-shrink: 0;
+  /* NO min-width — must be free to shrink to 0 */
+  width: 232px;
+  flex-shrink: 0;
   background: var(--sidebar-bg); color: var(--sidebar-text);
   display: flex; flex-direction: column;
   position: sticky; top: 0; height: 100vh;
-  /* overflow MUST be hidden on both axes so content vanishes when width→0 */
-  overflow: hidden;
-  transition: width .22s cubic-bezier(.4,0,.2,1),
-              min-width .22s cubic-bezier(.4,0,.2,1);
-  will-change: width;
+  overflow: hidden;           /* clips inner content when width → 0 */
+  transition: width .25s ease;
 }
-/* Inner wrapper handles the actual scroll so overflow:hidden on sidebar works */
+/* Inner wrapper is fixed-width so content doesn't reflow during animation;
+   it gets clipped by the outer overflow:hidden */
 .admin-sidebar-inner {
-  width: 232px; min-width: 232px;
-  display: flex; flex-direction: column; flex: 1;
+  width: 232px;
+  min-width: 232px;
+  flex: 1;
+  display: flex; flex-direction: column;
   overflow-y: auto;
 }
 
@@ -111,11 +113,9 @@
 .admin-nav a.logout { color: #f87171; }
 .admin-nav a.logout:hover { background: rgba(248,65,65,.12); color: #fca5a5; }
 
-/* Collapsed — sidebar shrinks to zero, inner content stays 232px wide
-   but is clipped by the outer overflow:hidden wrapper */
+/* Collapsed — outer shrinks to 0, inner (232px) gets fully clipped */
 .admin-wrap.sidebar-collapsed .admin-sidebar {
   width: 0;
-  min-width: 0;
 }
 
 /* Backdrop — not used in push mode, kept hidden always */
