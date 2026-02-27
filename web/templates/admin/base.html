@@ -79,9 +79,16 @@
     </nav>
   </aside>
 
+  <!-- Sidebar backdrop (mobile / collapsed) -->
+  <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+
   <!-- Main area -->
   <div class="admin-main">
     <div class="admin-topbar">
+      <!-- Hamburger toggle -->
+      <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Toggle menu" aria-label="Toggle sidebar">
+        <span></span><span></span><span></span>
+      </button>
       <h1>{% block page_title %}Admin{% endblock %}</h1>
       <div class="admin-topbar-right">
         {% block topbar_actions %}{% endblock %}
@@ -215,6 +222,36 @@ function fmtTime(iso) {
 function escHtml(s) {
   return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+// ── Sidebar collapse ───────────────────────────────────────────
+const SIDEBAR_KEY = 'bwc_sidebar_collapsed';
+
+function toggleSidebar() {
+  const wrap = document.querySelector('.admin-wrap');
+  const collapsed = wrap.classList.toggle('sidebar-collapsed');
+  localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
+  updateBackdrop(collapsed);
+}
+
+function closeSidebar() {
+  const wrap = document.querySelector('.admin-wrap');
+  wrap.classList.remove('sidebar-collapsed');
+  localStorage.setItem(SIDEBAR_KEY, '0');
+  updateBackdrop(false);
+}
+
+function updateBackdrop(show) {
+  const bd = document.getElementById('sidebarBackdrop');
+  if (bd) bd.classList.toggle('visible', show);
+}
+
+// Restore state on load
+document.addEventListener('DOMContentLoaded', () => {
+  if (localStorage.getItem(SIDEBAR_KEY) === '1') {
+    document.querySelector('.admin-wrap').classList.add('sidebar-collapsed');
+    updateBackdrop(true);
+  }
+});
 </script>
 </body>
 </html>

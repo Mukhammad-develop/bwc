@@ -100,18 +100,69 @@
 .admin-nav a.logout { color: #f87171; }
 .admin-nav a.logout:hover { background: rgba(248,65,65,.12); color: #fca5a5; }
 
+/* ── Sidebar slide transition ── */
+.admin-sidebar {
+  transition: width .22s cubic-bezier(.4,0,.2,1),
+              transform .22s cubic-bezier(.4,0,.2,1);
+  will-change: width;
+  overflow: hidden;
+}
+
+/* Collapsed state — sidebar shrinks to 0 */
+.admin-wrap.sidebar-collapsed .admin-sidebar {
+  width: 0;
+}
+
+/* Backdrop (visible when sidebar open on small screens) */
+.sidebar-backdrop {
+  display: none;
+  position: fixed; inset: 0; z-index: 39;
+  background: rgba(15, 23, 42, .35);
+  backdrop-filter: blur(1px);
+  animation: fadeIn .18s ease;
+}
+.sidebar-backdrop.visible { display: block; }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+/* ── Hamburger button ── */
+.sidebar-toggle {
+  display: flex; flex-direction: column; justify-content: center;
+  gap: 5px; width: 34px; height: 34px; padding: 6px;
+  background: transparent; border: none; cursor: pointer;
+  border-radius: var(--radius-md); flex-shrink: 0;
+  margin-right: 6px;
+  transition: background .13s;
+}
+.sidebar-toggle:hover { background: var(--bg-hover); }
+.sidebar-toggle span {
+  display: block; height: 1.5px; background: var(--text-muted);
+  border-radius: 2px; transition: all .22s cubic-bezier(.4,0,.2,1);
+  transform-origin: center;
+}
+
+/* Animate hamburger → X when collapsed */
+.sidebar-collapsed .sidebar-toggle span:nth-child(1) {
+  transform: translateY(6.5px) rotate(45deg);
+}
+.sidebar-collapsed .sidebar-toggle span:nth-child(2) {
+  opacity: 0; transform: scaleX(0);
+}
+.sidebar-collapsed .sidebar-toggle span:nth-child(3) {
+  transform: translateY(-6.5px) rotate(-45deg);
+}
+
 /* ── Main ── */
 .admin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
 .admin-topbar {
   background: var(--bg-card); border-bottom: 1px solid var(--border);
-  padding: 0 28px; height: 56px; display: flex; align-items: center;
+  padding: 0 20px 0 14px; height: 56px; display: flex; align-items: center;
   justify-content: space-between; position: sticky; top: 0; z-index: 50;
   box-shadow: var(--shadow-xs);
 }
 .admin-topbar h1 {
   font-size: 1rem; font-weight: 700; color: var(--text-head);
-  margin: 0;
+  margin: 0; flex: 1;
 }
 .admin-topbar-right { display: flex; align-items: center; gap: 8px; }
 
