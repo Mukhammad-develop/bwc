@@ -952,9 +952,19 @@ def admin_transcribe_document(doc_id):
         doc = conn.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
         if not doc:
             return jsonify({"error": "Document not found"}), 404
-        case = conn.execute("SELECT * FROM cases WHERE id=?", (doc["case_id"],)).fetchone()
+        case = conn.execute(
+            "SELECT c.*, u.language FROM cases c JOIN users u ON c.user_id=u.id WHERE c.id=?",
+            (doc["case_id"],),
+        ).fetchone()
         if not case or not can_view_user(case["user_id"]):
             return jsonify({"error": "Access denied"}), 403
+
+    # Language hint for Whisper (ISO 639-1); improves accuracy for Uzbek, Russian, etc.
+    lang = (case.get("language") or "").strip().lower()
+    if len(lang) in (2, 3) and lang.isalpha():
+        whisper_lang = lang
+    else:
+        whisper_lang = None
 
     file_id = doc["file_id"]
     filename = doc["filename"] or "audio.oga"
@@ -983,14 +993,17 @@ def admin_transcribe_document(doc_id):
     if not OPENAI_API_KEY:
         return jsonify({"error": "OpenAI API key not configured"}), 503
 
-    # Whisper API
+    # Whisper API (optional language hint from user's case language)
+    whisper_data = {"model": "whisper-1"}
+    if whisper_lang:
+        whisper_data["language"] = whisper_lang
     try:
         with requests.Session() as s:
             resp = s.post(
                 "https://api.openai.com/v1/audio/transcriptions",
                 headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
                 files={"file": (filename, data, _mimetype_for(filename) or "audio/ogg")},
-                data={"model": "whisper-1"},
+                data=whisper_data,
                 timeout=60,
             )
         resp.raise_for_status()
