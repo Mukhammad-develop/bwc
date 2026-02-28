@@ -19,7 +19,10 @@
           Enter the Telegram user ID (or @username) of a client whose conversation with your
           personal Telegram account happened <em>before</em> the userbot was connected.
           The userbot will fetch the full message history and import it into the admin panel.
-          The userbot must be running for this to work.
+        </div>
+        <div style="margin-top:10px;padding:10px 12px;background:var(--warning-tint);border-radius:var(--radius-md);font-size:.8rem;color:var(--warning)">
+          <strong>Important:</strong> The Telegram userbot (<code>python userbot.py</code>) must be running
+          (e.g. as an Always-On task on PythonAnywhere). If it is not running, imports will stay in Pending.
         </div>
       </div>
     </div>
