@@ -2,6 +2,8 @@ import os
 import json
 import mimetypes
 import sqlite3
+import subprocess
+import tempfile
 import requests
 from datetime import datetime, timedelta
 from functools import wraps
@@ -432,6 +434,56 @@ def _mimetype_for(filename):
         return "audio/mp4"
     if ext == ".webm":
         return "audio/webm"
+    return None
+
+
+# Whisper API only accepts: mp3, mp4, mpeg, mpga, m4a, wav, webm (not oga/ogg)
+_WHISPER_SUPPORTED_EXT = (".mp3", ".mp4", ".mpeg", ".mpga", ".m4a", ".wav", ".webm")
+
+_VOICE_EXTENSIONS = (".oga", ".ogg", ".mp3", ".m4a", ".webm")
+
+
+def _is_voice_doc(doc):
+    """True if document is a voice/audio message (excluded from Files tab)."""
+    if not doc:
+        return False
+    d = dict(doc) if hasattr(doc, "keys") else doc
+    if (d.get("media_type") or "").lower() == "voice":
+        return True
+    fname = (d.get("filename") or d.get("doc_type") or "").lower()
+    return fname.endswith(_VOICE_EXTENSIONS)
+
+
+def _convert_audio_to_wav(data: bytes, input_ext: str):
+    """Convert oga/ogg or other unsupported audio to WAV using ffmpeg. Returns (wav_bytes, 'audio.wav') or None."""
+    if not data:
+        return None
+    ext = (input_ext or "").lower()
+    if not ext.startswith("."):
+        ext = "." + ext
+    try:
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as fin:
+            fin.write(data)
+            fin.flush()
+            in_path = fin.name
+        out_path = in_path + ".wav"
+        try:
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", in_path, "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", out_path],
+                check=True,
+                capture_output=True,
+                timeout=60,
+            )
+            if os.path.exists(out_path):
+                with open(out_path, "rb") as f:
+                    out_data = f.read()
+                os.unlink(out_path)
+                return (out_data, "audio.wav")
+        finally:
+            if os.path.exists(in_path):
+                os.unlink(in_path)
+    except (subprocess.CalledProcessError, FileNotFoundError, OSError):
+        pass
     return None
 
 
@@ -866,10 +918,12 @@ def admin_case_detail(case_id):
             fname = doc["filename"] or doc["doc_type"] or ""
             if fname and fname not in docs_by_filename:
                 docs_by_filename[fname] = entry
+        docs_for_files = [e for e in docs_with_url if not _is_voice_doc(e["doc"])]
 
     return render_template("admin/case_detail.html",
         case=case, conversation=conversation,
         docs_with_url=docs_with_url,
+        docs_for_files=docs_for_files,
         docs_by_unique_id=docs_by_unique_id,
         docs_by_filename=docs_by_filename,
         is_master=session.get("admin_role")=="master")
@@ -993,6 +1047,18 @@ def admin_transcribe_document(doc_id):
     if not OPENAI_API_KEY:
         return jsonify({"error": "OpenAI API key not configured"}), 503
 
+    # Whisper only supports mp3, mp4, mpeg, mpga, m4a, wav, webm — convert .oga/.ogg via ffmpeg
+    ext = (Path(filename).suffix or "").lower()
+    if ext not in _WHISPER_SUPPORTED_EXT:
+        converted = _convert_audio_to_wav(data, ext)
+        if converted:
+            data, filename = converted
+            ext = ".wav"
+        else:
+            return jsonify({
+                "error": "Audio format not supported by Whisper (need .oga→.wav conversion). Install ffmpeg on the server."
+            }), 400
+
     # Whisper API (optional language hint from user's case language)
     whisper_data = {"model": "whisper-1"}
     if whisper_lang:
@@ -1002,14 +1068,21 @@ def admin_transcribe_document(doc_id):
             resp = s.post(
                 "https://api.openai.com/v1/audio/transcriptions",
                 headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-                files={"file": (filename, data, _mimetype_for(filename) or "audio/ogg")},
+                files={"file": (filename, data, _mimetype_for(filename) or "audio/wav")},
                 data=whisper_data,
                 timeout=60,
             )
-        resp.raise_for_status()
+        if not resp.ok:
+            try:
+                err_body = resp.json()
+                err = err_body.get("error")
+                msg = err.get("message", str(err)) if isinstance(err, dict) else (str(err) if err else resp.text or resp.reason)
+            except Exception:
+                msg = resp.text or resp.reason or f"HTTP {resp.status_code}"
+            return jsonify({"error": msg or f"HTTP {resp.status_code}"}), resp.status_code
         result = resp.json()
         text = (result.get("text") or "").strip()
-    except Exception as e:
+    except requests.RequestException as e:
         return jsonify({"error": str(e)}), 502
 
     with get_db() as conn:
@@ -1129,9 +1202,11 @@ def admin_user_profile(user_db_id):
         fname = d["filename"] or d["doc_type"] or ""
         if fname and fname not in all_docs_by_filename:
             all_docs_by_filename[fname] = entry
+    docs_for_files = [e for e in docs_with_url if not _is_voice_doc(e["doc"])]
 
     return render_template("admin/user_profile.html",
         user=user, cases=cases, docs_with_url=docs_with_url,
+        docs_for_files=docs_for_files,
         profile=profile, profile_updated=profile_row["updated_at"] if profile_row else None,
         is_master=session.get("admin_role")=="master",
         is_elevated=is_elevated(),

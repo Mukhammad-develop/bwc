@@ -98,7 +98,7 @@
           </div>
           <div style="display:flex;justify-content:space-between;font-size:.8rem;margin-top:4px">
             <span style="color:#64748b">Total files</span>
-            <span style="font-weight:600">{{ docs_with_url|length }}</span>
+            <span style="font-weight:600">{{ docs_for_files|length }}</span>
           </div>
         </div>
       </div>
@@ -148,7 +148,7 @@
   <div>
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('tab-chats', this)">Chat History ({{ cases|length }})</button>
-      <button class="tab-btn" onclick="switchTab('tab-files', this)">Files ({{ docs_with_url|length }})</button>
+      <button class="tab-btn" onclick="switchTab('tab-files', this)">Files ({{ docs_for_files|length }})</button>
     </div>
 
     <!-- Chats tab — live unified timeline -->
@@ -276,11 +276,11 @@
       </div>
     </div>
 
-    <!-- Files tab -->
+    <!-- Files tab (excludes voice messages) -->
     <div class="tab-pane" id="tab-files">
-      {% if docs_with_url %}
+      {% if docs_for_files %}
         <div class="files-grid">
-          {% for item in docs_with_url %}
+          {% for item in docs_for_files %}
           {% set doc = item.doc %}
           {% set url = item.url %}
           <div class="file-card">
@@ -323,7 +323,7 @@
         <div class="empty-state">
           <div class="es-icon">📎</div>
           <h3>No files uploaded</h3>
-          <p>This user hasn't sent any documents or photos yet.</p>
+          <p>This user hasn't sent any documents or photos yet. (Voice messages appear in Chat only.)</p>
         </div>
       {% endif %}
     </div>

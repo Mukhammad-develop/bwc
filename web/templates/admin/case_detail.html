@@ -125,15 +125,15 @@
       </div>
     </div>
 
-    <!-- Uploaded files -->
-    {% if docs_with_url %}
+    <!-- Uploaded files (excludes voice messages) -->
+    {% if docs_for_files %}
     <div class="card" style="margin-top:20px">
       <div class="card-header">
-        <h3>📎 Uploaded Files ({{ docs_with_url|length }})</h3>
+        <h3>Uploaded Files ({{ docs_for_files|length }})</h3>
       </div>
       <div class="card-body">
         <div class="files-grid">
-          {% for item in docs_with_url %}
+          {% for item in docs_for_files %}
           {% set doc = item.doc %}
           {% set url = item.url %}
           <div class="file-card">
@@ -249,11 +249,11 @@
     {% endif %}
 
     <!-- Quick file list -->
-    {% if docs_with_url %}
+    {% if docs_for_files %}
     <div class="card">
-      <div class="card-header"><h3>Files ({{ docs_with_url|length }})</h3></div>
+      <div class="card-header"><h3>Files ({{ docs_for_files|length }})</h3></div>
       <div class="card-body" style="padding:12px">
-        {% for item in docs_with_url %}
+        {% for item in docs_for_files %}
         {% set doc = item.doc %}
         <div class="msg-file" style="margin-bottom:6px">
           <span class="file-icon">
