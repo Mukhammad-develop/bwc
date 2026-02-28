@@ -442,11 +442,6 @@ async function adminSendMessage() {
   const text  = (input.value || '').trim();
   if (!text) return;
 
-  // Optimistic UI: show bubble immediately
-  const tempTs = new Date().toISOString().substring(0,16).replace('T',' ');
-  appendBubble({ role:'admin', content: text, timestamp: tempTs, sender: '{{ session.admin_display or session.admin_username }}' });
-  scrollToBottom();
-
   input.value = '';
   input.style.height = 'auto';
   btn.disabled = true;
@@ -459,10 +454,12 @@ async function adminSendMessage() {
     });
     const data = await res.json();
 
-    if (!data.ok) {
+    if (data.ok) {
+      // Message is in DB; trigger one poll soon so it appears without waiting 3s
+      setTimeout(poll, 400);
+    } else {
       alert(data.error || 'Failed to send.');
     }
-    // The real message will arrive via polling with the correct timestamp
   } catch(e) {
     alert('Network error — could not send.');
   }
