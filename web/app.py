@@ -1207,7 +1207,35 @@ def admin_poll_messages(user_db_id):
 
     # Sort by timestamp
     new_msgs.sort(key=lambda m: m["timestamp"])
-    return jsonify({"messages": new_msgs})
+
+    # Collect file_docs for [FILE:unique_id:filename:type] so the client can render voice bubbles in live view
+    import re
+    unique_ids = set()
+    for m in new_msgs:
+        c = m.get("content", "") or ""
+        if c.startswith("[FILE:") and ":" in c[6:]:
+            parts = c[6:].split(":")
+            if parts:
+                unique_ids.add(parts[0])
+    file_docs = {}
+    if unique_ids and cases:
+        case_ids = [c["id"] for c in cases]
+        placeholders = ",".join("?" * len(case_ids))
+        placeholders2 = ",".join("?" * len(unique_ids))
+        with get_db() as conn:
+            rows = conn.execute(
+                f"""SELECT id, file_id, filename, file_unique_id, transcription
+                    FROM documents WHERE case_id IN ({placeholders}) AND file_unique_id IN ({placeholders2})""",
+                (*case_ids, *list(unique_ids)),
+            ).fetchall()
+        for row in rows:
+            file_docs[row["file_unique_id"]] = {
+                "id": row["id"],
+                "file_id": row["file_id"],
+                "filename": row["filename"] or "",
+                "transcription": row["transcription"] or "",
+            }
+    return jsonify({"messages": new_msgs, "file_docs": file_docs})
 
 
 @app.route("/admin/users/<int:user_db_id>/extract-profile", methods=["POST"])

@@ -387,23 +387,23 @@ document.addEventListener('DOMContentLoaded', () => {
   // Start polling
   startPolling();
 
-  // When voice playback fails, show a friendly message instead of browser "Error"
-  document.querySelectorAll('.msg-voice-player').forEach(a => {
-    a.addEventListener('error', function() {
-      const fallback = this.closest('.msg-voice-bubble')?.querySelector('.msg-voice-load-error');
-      if (fallback) fallback.style.display = 'block';
+  // Event delegation: voice playback error and Generate lyrics (work for dynamically added bubbles too)
+  if (chat) {
+    chat.addEventListener('error', function(e) {
+      if (e.target.classList && e.target.classList.contains('msg-voice-player')) {
+        const fallback = e.target.closest('.msg-voice-bubble')?.querySelector('.msg-voice-load-error');
+        if (fallback) fallback.style.display = 'block';
+      }
     });
-  });
-
-  // Generate lyrics (Whisper) for voice messages
-  document.querySelectorAll('.btn-transcribe').forEach(btn => {
-    btn.addEventListener('click', async function() {
-      const docId = this.getAttribute('data-doc-id');
+    chat.addEventListener('click', async function(e) {
+      const btn = e.target.closest('.btn-transcribe');
+      if (!btn) return;
+      const docId = btn.getAttribute('data-doc-id');
       const wrap = document.getElementById('lyrics-' + docId);
       const textEl = wrap && wrap.querySelector('.msg-voice-lyrics-text');
       if (!wrap || !textEl) return;
-      this.disabled = true;
-      this.textContent = '…';
+      btn.disabled = true;
+      btn.textContent = '…';
       try {
         const r = await fetch('/admin/documents/' + docId + '/transcribe', {
           method: 'POST',
@@ -418,14 +418,14 @@ document.addEventListener('DOMContentLoaded', () => {
           textEl.textContent = data.error || 'Transcription unavailable. File may be missing or format not supported.';
           wrap.style.display = 'block';
         }
-      } catch (e) {
+      } catch (err) {
         textEl.textContent = 'Network error';
         wrap.style.display = 'block';
       }
-      this.disabled = false;
-      this.textContent = 'Generate lyrics';
+      btn.disabled = false;
+      btn.textContent = 'Generate lyrics';
     });
-  });
+  }
 });
 
 // ── Polling ────────────────────────────────────────────────────────────────
@@ -449,18 +449,25 @@ async function poll() {
       // Remove empty-state placeholder
       document.getElementById('chatEmpty')?.remove();
 
+      const fileDocs = data.file_docs || {};
       data.messages.forEach(msg => {
         if (!msg.content) return;
-        // Show user file/voice messages as a placeholder in live view (full UI on refresh)
-        let displayMsg = msg;
         if (msg.content.startsWith('[FILE:')) {
-          const m = msg.content.match(/^\[FILE:[^:]*:([^:]*):(\w+)\]$/);
-          const filename = m ? m[1] : '';
-          const type = m ? m[2] : '';
-          const label = (type === 'voice' || /\.(oga|ogg|mp3|m4a|webm)$/i.test(filename)) ? 'Voice message' : (filename || 'File');
-          displayMsg = { ...msg, content: label };
+          const m = msg.content.match(/^\[FILE:([^:]+):([^:]*):(\w+)\]$/);
+          const uniqueId = m ? m[1] : '';
+          const filename = m ? m[2] : '';
+          const type = m ? m[3] : '';
+          const isVoice = type === 'voice' || /\.(oga|ogg|mp3|m4a|webm)$/i.test(filename);
+          const doc = uniqueId ? fileDocs[uniqueId] : null;
+          if (isVoice && doc) {
+            appendVoiceBubble(msg, doc);
+          } else {
+            const label = isVoice ? 'Voice message' : (filename || 'File');
+            appendBubble({ ...msg, content: label });
+          }
+        } else {
+          appendBubble(msg);
         }
-        appendBubble(displayMsg);
         if (msg.timestamp > lastTs) lastTs = msg.timestamp;
       });
 
@@ -509,6 +516,38 @@ function appendBubble(msg, opts = {}) {
     if (bubble) bubble.innerHTML = marked.parse(msg.content);
   }
 
+  chat.appendChild(el);
+}
+
+// ── Append voice message bubble (full player) for live view ──────────────────
+function appendVoiceBubble(msg, doc) {
+  const chat = document.getElementById('unifiedChat');
+  if (!chat) return;
+  const viewUrl = `/admin/files/view/${encodeURIComponent(doc.file_id)}`;
+  const downloadUrl = `/admin/files/download/${encodeURIComponent(doc.file_id)}?name=${encodeURIComponent(doc.filename || 'file')}`;
+  const metaTime = msg.timestamp ? ' · ' + msg.timestamp.substring(0, 16).replace('T', ' ') : '';
+  const lyricsDisplay = doc.transcription ? '' : ' style="display:none"';
+  const lyricsText = (doc.transcription || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const el = document.createElement('div');
+  el.className = 'chat-msg user';
+  el.setAttribute('data-ts', msg.timestamp || '');
+  el.innerHTML = `
+    <div class="msg-avatar">U</div>
+    <div style="max-width:100%">
+      <div class="msg-voice-bubble">
+        <audio controls preload="metadata" class="msg-voice-player" src="${viewUrl}">Your browser does not support audio.</audio>
+        <div class="msg-voice-load-error" style="display:none;font-size:.75rem;color:var(--text-muted);margin-top:4px">Playback unavailable. Try Download.</div>
+        <div class="msg-voice-actions">
+          <a href="${downloadUrl}" class="btn btn-ghost btn-sm">Download</a>
+          <button type="button" class="btn btn-ghost btn-sm btn-transcribe" data-doc-id="${doc.id}">Generate lyrics</button>
+        </div>
+        <div class="msg-voice-lyrics" id="lyrics-${doc.id}"${lyricsDisplay}>
+          <div class="msg-voice-lyrics-label">Lyrics</div>
+          <div class="msg-voice-lyrics-text">${lyricsText}</div>
+        </div>
+      </div>
+      <div class="msg-meta">User${metaTime}</div>
+    </div>`;
   chat.appendChild(el);
 }
 
