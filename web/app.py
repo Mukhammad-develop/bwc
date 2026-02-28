@@ -876,7 +876,13 @@ def admin_case_update(case_id):
 @app.route("/admin/files/view/<file_id>")
 @login_required
 def admin_file_view(file_id):
-    """Proxy a Telegram file inline (for images)."""
+    """Serve file inline (local from disk, Telegram via API)."""
+    if file_id.startswith("local:"):
+        filename = file_id[6:]
+        safe = UPLOADS_DIR / Path(filename).name
+        if not safe.exists():
+            return "File not found", 404
+        return send_file(str(safe), as_attachment=False)
     url = get_tg_file_url(file_id)
     if not url:
         return "File not available", 404
@@ -891,8 +897,14 @@ def admin_file_view(file_id):
 @app.route("/admin/files/download/<file_id>")
 @login_required
 def admin_file_download(file_id):
-    """Proxy a Telegram file as a download."""
-    filename = request.args.get("name", "file")
+    """Serve file as download (local from disk, Telegram via API)."""
+    download_name = request.args.get("name", "file")
+    if file_id.startswith("local:"):
+        filename = file_id[6:]
+        safe = UPLOADS_DIR / Path(filename).name
+        if not safe.exists():
+            return "File not found", 404
+        return send_file(str(safe), as_attachment=True, download_name=download_name)
     url = get_tg_file_url(file_id)
     if not url:
         return "File not available", 404
@@ -900,7 +912,7 @@ def admin_file_download(file_id):
         r = requests.get(url, timeout=30)
         from io import BytesIO
         return send_file(BytesIO(r.content),
-                         download_name=filename,
+                         download_name=download_name,
                          as_attachment=True,
                          mimetype=r.headers.get("Content-Type", "application/octet-stream"))
     except Exception as e:
