@@ -541,6 +541,40 @@ table.admin-table tr:hover td { background: var(--bg-hover); }
 }
 .msg-file-actions { display: flex; gap: 5px; flex-wrap: wrap; }
 
+/* Voice message — Telegram-style inline player */
+.msg-voice-bubble {
+  max-width: 320px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+}
+.msg-voice-player {
+  width: 100%;
+  height: 36px;
+  margin-bottom: 8px;
+  accent-color: var(--primary);
+}
+.msg-voice-player::-webkit-media-controls-panel { background: var(--bg-hover); }
+.msg-voice-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.msg-voice-lyrics { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.msg-voice-lyrics-label {
+  font-size: .65rem;
+  font-weight: 700;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 4px;
+}
+.msg-voice-lyrics-text {
+  font-size: .8rem;
+  color: var(--text-body);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ══════════════════════════════════════════════
    USER PROFILE
    ══════════════════════════════════════════════ */

@@ -1,5 +1,6 @@
 import os
 import json
+import mimetypes
 import sqlite3
 import requests
 from datetime import datetime, timedelta
@@ -121,6 +122,11 @@ def init_admin_tables():
             conn.execute("UPDATE documents SET filename = doc_type WHERE filename IS NULL")
             conn.commit()
         except Exception:
+            pass
+        try:
+            conn.execute("ALTER TABLE documents ADD COLUMN transcription TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
             pass
 
 
@@ -412,6 +418,23 @@ def get_tg_file_url(file_id):
     return None
 
 
+def _mimetype_for(filename):
+    """Return mimetype for playback; default audio/ogg for .oga."""
+    if not filename:
+        return None
+    mt, _ = mimetypes.guess_type(filename)
+    if mt:
+        return mt
+    ext = (Path(filename).suffix or "").lower()
+    if ext in (".oga", ".ogg"):
+        return "audio/ogg"
+    if ext == ".m4a":
+        return "audio/mp4"
+    if ext == ".webm":
+        return "audio/webm"
+    return None
+
+
 @app.route("/admin/files/local/<path:filename>")
 @login_required
 def admin_local_file(filename):
@@ -419,7 +442,8 @@ def admin_local_file(filename):
     safe = UPLOADS_DIR / Path(filename).name   # prevent directory traversal
     if not safe.exists():
         return "File not found", 404
-    return send_file(str(safe), as_attachment=False)
+    mt = _mimetype_for(filename)
+    return send_file(str(safe), as_attachment=False, mimetype=mt)
 
 
 # ─────────────────────────── STATS & REPORTS ──────────────────────
@@ -882,7 +906,8 @@ def admin_file_view(file_id):
         safe = UPLOADS_DIR / Path(filename).name
         if not safe.exists():
             return "File not found", 404
-        return send_file(str(safe), as_attachment=False)
+        mt = _mimetype_for(filename)
+        return send_file(str(safe), as_attachment=False, mimetype=mt)
     url = get_tg_file_url(file_id)
     if not url:
         return "File not available", 404
@@ -917,6 +942,67 @@ def admin_file_download(file_id):
                          mimetype=r.headers.get("Content-Type", "application/octet-stream"))
     except Exception as e:
         return f"Error: {e}", 500
+
+
+@app.route("/admin/documents/<int:doc_id>/transcribe", methods=["POST"])
+@login_required
+def admin_transcribe_document(doc_id):
+    """Transcribe a voice/audio document using OpenAI Whisper; store and return text."""
+    with get_db() as conn:
+        doc = conn.execute("SELECT * FROM documents WHERE id=?", (doc_id,)).fetchone()
+        if not doc:
+            return jsonify({"error": "Document not found"}), 404
+        case = conn.execute("SELECT * FROM cases WHERE id=?", (doc["case_id"],)).fetchone()
+        if not case or not can_view_user(case["user_id"]):
+            return jsonify({"error": "Access denied"}), 403
+
+    file_id = doc["file_id"]
+    filename = doc["filename"] or "audio.oga"
+
+    # Get file bytes
+    if file_id.startswith("local:"):
+        path = UPLOADS_DIR / Path(filename).name
+        if not path.exists():
+            return jsonify({"error": "File not found on disk"}), 404
+        with open(path, "rb") as f:
+            data = f.read()
+    else:
+        url = get_tg_file_url(file_id)
+        if not url:
+            return jsonify({"error": "File URL unavailable"}), 404
+        if not url.startswith("http"):
+            url = request.url_root.rstrip("/") + url
+        try:
+            r = requests.get(url, timeout=60)
+            r.raise_for_status()
+            data = r.content
+        except Exception as e:
+            return jsonify({"error": str(e)}), 502
+
+    if not OPENAI_API_KEY:
+        return jsonify({"error": "OpenAI API key not configured"}), 503
+
+    # Whisper API
+    try:
+        with requests.Session() as s:
+            resp = s.post(
+                "https://api.openai.com/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                files={"file": (filename, data, _mimetype_for(filename) or "audio/ogg")},
+                data={"model": "whisper-1"},
+                timeout=60,
+            )
+        resp.raise_for_status()
+        result = resp.json()
+        text = (result.get("text") or "").strip()
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+    with get_db() as conn:
+        conn.execute("UPDATE documents SET transcription=? WHERE id=?", (text, doc_id))
+        conn.commit()
+
+    return jsonify({"ok": True, "text": text})
 
 
 # ─────────────────────────── USERS & PROFILES ─────────────────────

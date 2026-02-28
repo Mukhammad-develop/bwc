@@ -179,6 +179,28 @@
                 {% else %}
                   {% set entry = none %}
                 {% endif %}
+                {% set is_voice = parsed.filename and parsed.filename.lower().endswith(('.oga','.ogg','.mp3','.m4a','.webm')) %}
+                {% if entry and is_voice %}
+                <div class="msg-voice-bubble">
+                  <audio controls preload="metadata" class="msg-voice-player"
+                         src="{{ url_for('admin_file_view', file_id=entry.doc.file_id) }}">
+                    Your browser does not support audio.
+                  </audio>
+                  <div class="msg-voice-actions">
+                    <a href="{{ url_for('admin_file_download', file_id=entry.doc.file_id, name=parsed.filename) }}"
+                       class="btn btn-ghost btn-sm">Download</a>
+                    <button type="button" class="btn btn-ghost btn-sm btn-transcribe"
+                            data-doc-id="{{ entry.doc.id }}">
+                      Generate lyrics
+                    </button>
+                  </div>
+                  <div class="msg-voice-lyrics" id="lyrics-{{ entry.doc.id }}"
+                       {% if not entry.doc.transcription %}style="display:none"{% endif %}>
+                    <div class="msg-voice-lyrics-label">Lyrics</div>
+                    <div class="msg-voice-lyrics-text">{% if entry.doc.transcription %}{{ entry.doc.transcription }}{% endif %}</div>
+                  </div>
+                </div>
+                {% else %}
                 <div class="msg-file-bubble">
                   {% if entry and entry.doc.media_type == 'photo' and entry.url %}
                     <div class="msg-file-thumb">
@@ -199,15 +221,16 @@
                     <div class="msg-file-actions">
                       {% if entry and entry.url %}
                         <a href="{{ url_for('admin_file_view', file_id=entry.doc.file_id) }}"
-                           target="_blank" class="btn btn-ghost btn-sm">👁️ View</a>
+                           target="_blank" class="btn btn-ghost btn-sm">View</a>
                         <a href="{{ url_for('admin_file_download', file_id=entry.doc.file_id, name=parsed.filename) }}"
-                           class="btn btn-primary btn-sm">⬇️ Download</a>
+                           class="btn btn-primary btn-sm">Download</a>
                       {% else %}
                         <span style="font-size:.7rem;color:#94a3b8">File unavailable</span>
                       {% endif %}
                     </div>
                   </div>
                 </div>
+                {% endif %}
               {% else %}
                 <div class="msg-bubble markdown-body">{{ msg.content }}</div>
               {% endif %}
@@ -358,6 +381,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Start polling
   startPolling();
+
+  // Generate lyrics (Whisper) for voice messages
+  document.querySelectorAll('.btn-transcribe').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const docId = this.getAttribute('data-doc-id');
+      const wrap = document.getElementById('lyrics-' + docId);
+      const textEl = wrap && wrap.querySelector('.msg-voice-lyrics-text');
+      if (!wrap || !textEl) return;
+      this.disabled = true;
+      this.textContent = '…';
+      try {
+        const r = await fetch('/admin/documents/' + docId + '/transcribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'same-origin'
+        });
+        const data = await r.json();
+        if (data.ok && data.text) {
+          textEl.textContent = data.text;
+          wrap.style.display = 'block';
+        } else {
+          textEl.textContent = data.error || 'Transcription failed';
+          wrap.style.display = 'block';
+        }
+      } catch (e) {
+        textEl.textContent = 'Network error';
+        wrap.style.display = 'block';
+      }
+      this.disabled = false;
+      this.textContent = 'Generate lyrics';
+    });
+  });
 });
 
 // ── Polling ────────────────────────────────────────────────────────────────

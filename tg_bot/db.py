@@ -112,6 +112,11 @@ def init_db(db_path: str) -> None:
             conn.commit()
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute("ALTER TABLE documents ADD COLUMN transcription TEXT")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
         # import_requests table (older DBs)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS import_requests (
