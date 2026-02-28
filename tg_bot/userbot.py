@@ -12,6 +12,7 @@ NORMAL RUN:
 """
 
 import asyncio
+import json
 import mimetypes
 import os
 import sys
@@ -293,6 +294,74 @@ async def handle_media(event):
             await safe_send(event, t(lang, "doc_received"))
 
 
+# ── Chat import loop ─────────────────────────────────────────────────────────
+
+async def process_import(req_id: int, user_tg_id: str):
+    """
+    Fetch full message history between this personal account and user_tg_id
+    from Telegram, then save it as a case in the database.
+    """
+    print(f"[Userbot] import #{req_id} → tg_id={user_tg_id}")
+    try:
+        peer = int(user_tg_id)
+    except ValueError:
+        peer = user_tg_id  # username string
+
+    try:
+        # Fetch up to 3000 messages (Telethon pages automatically)
+        raw_msgs = await client.get_messages(peer, limit=3000)
+    except Exception as e:
+        with db.connect(DB_PATH) as conn:
+            db.update_import_status(conn, req_id, "error", error_msg=str(e))
+        print(f"[Userbot] import #{req_id} error fetching: {e}")
+        return
+
+    # Oldest first
+    raw_msgs = list(reversed(raw_msgs))
+
+    conv = []
+    for msg in raw_msgs:
+        text = getattr(msg, "text", "") or ""
+        has_media = bool(getattr(msg, "media", None))
+        if not text and not has_media:
+            continue
+        role = "admin" if msg.out else "user"
+        ts   = msg.date.isoformat() if msg.date else _now_iso_sync()
+        content = text if text else "[media attachment]"
+        conv.append({"role": role, "content": content, "timestamp": ts})
+
+    with db.connect(DB_PATH) as conn:
+        user_db_id = db.get_or_create_user(conn, int(user_tg_id) if str(user_tg_id).lstrip("-").isdigit() else 0)
+        # Use an existing case or create a new one tagged as imported
+        case_id = db.create_case(conn, user_db_id, "general")
+        db.update_case(conn, case_id, conversation_history=json.dumps(conv))
+        db.update_import_status(conn, req_id, "done", message_count=len(conv))
+
+    print(f"[Userbot] import #{req_id} done — {len(conv)} messages")
+
+
+def _now_iso_sync() -> str:
+    from datetime import datetime
+    return datetime.utcnow().isoformat()
+
+
+async def import_queue_loop():
+    """Poll import_requests table every 5 seconds and process pending imports."""
+    print("[Userbot] import_queue_loop started")
+    while True:
+        await asyncio.sleep(5)
+        try:
+            with db.connect(DB_PATH) as conn:
+                rows = db.get_pending_imports(conn)
+            for row in rows:
+                # Mark as processing immediately so we don't double-process
+                with db.connect(DB_PATH) as conn:
+                    db.update_import_status(conn, row["id"], "processing")
+                await process_import(row["id"], row["user_tg_id"])
+        except Exception as e:
+            print(f"[Userbot] import_queue_loop error: {e}")
+
+
 # ── Admin → user send-queue loop ─────────────────────────────────────────────
 
 async def send_queue_loop():
@@ -348,10 +417,11 @@ async def main():
     print(f"[Userbot] DB: {DB_PATH}")
     print("[Userbot] Listening for messages…")
 
-    # Run the send-queue loop and the client concurrently
+    # Run all background loops concurrently alongside the client
     await asyncio.gather(
         client.run_until_disconnected(),
         send_queue_loop(),
+        import_queue_loop(),
     )
 
 

@@ -5,6 +5,17 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS import_requests (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_tg_id    TEXT    NOT NULL,
+    label         TEXT    DEFAULT '',
+    status        TEXT    DEFAULT 'pending',
+    message_count INTEGER DEFAULT 0,
+    error_msg     TEXT,
+    created_at    TEXT    NOT NULL,
+    completed_at  TEXT
+);
+
 CREATE TABLE IF NOT EXISTS pending_sends (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     user_tg_id  TEXT    NOT NULL,
@@ -101,6 +112,20 @@ def init_db(db_path: str) -> None:
             conn.commit()
         except sqlite3.OperationalError:
             pass
+        # import_requests table (older DBs)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS import_requests (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_tg_id    TEXT    NOT NULL,
+                label         TEXT    DEFAULT '',
+                status        TEXT    DEFAULT 'pending',
+                message_count INTEGER DEFAULT 0,
+                error_msg     TEXT,
+                created_at    TEXT    NOT NULL,
+                completed_at  TEXT
+            )
+        """)
+        conn.commit()
         # Create pending_sends if missing (older DBs)
         conn.execute("""
             CREATE TABLE IF NOT EXISTS pending_sends (
@@ -248,6 +273,40 @@ def mark_send_done(conn: sqlite3.Connection, send_id: int) -> None:
         (_now_iso(), send_id),
     )
     conn.commit()
+
+
+def queue_import(conn: sqlite3.Connection, user_tg_id: str, label: str = "") -> int:
+    """Queue a request to import chat history from Telegram for a given tg_id."""
+    cur = conn.execute(
+        "INSERT INTO import_requests (user_tg_id, label, status, created_at) VALUES (?, ?, 'pending', ?)",
+        (str(user_tg_id), label, _now_iso()),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_pending_imports(conn: sqlite3.Connection) -> List[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM import_requests WHERE status='pending' ORDER BY id ASC"
+    ).fetchall()
+
+
+def update_import_status(conn: sqlite3.Connection, req_id: int, status: str,
+                          message_count: int = 0, error_msg: str = "") -> None:
+    conn.execute(
+        """UPDATE import_requests
+           SET status=?, message_count=?, error_msg=?,
+               completed_at=CASE WHEN ? IN ('done','error') THEN ? ELSE completed_at END
+           WHERE id=?""",
+        (status, message_count, error_msg, status, _now_iso(), req_id),
+    )
+    conn.commit()
+
+
+def list_imports(conn: sqlite3.Connection) -> List[sqlite3.Row]:
+    return conn.execute(
+        "SELECT * FROM import_requests ORDER BY id DESC"
+    ).fetchall()
 
 
 def set_missing_docs(conn: sqlite3.Connection, case_id: int, missing: List[str]) -> None:

@@ -1212,6 +1212,46 @@ def admin_report_detail(report_id):
     return render_template("admin/report_detail.html", report=report, stats=stats)
 
 
+# ─────────────────────────── IMPORT CHAT ──────────────────────────
+
+@app.route("/admin/import-chat", methods=["GET", "POST"])
+@login_required
+@elevated_required
+def admin_import_chat():
+    """Queue a Telegram chat import request and show history of imports."""
+    if request.method == "POST":
+        raw = (request.form.get("tg_id") or "").strip().lstrip("@")
+        label = (request.form.get("label") or "").strip()
+        if not raw:
+            flash("Please enter a Telegram ID or username.", "warning")
+            return redirect(url_for("admin_import_chat"))
+        with get_db() as conn:
+            conn.execute(
+                """INSERT INTO import_requests (user_tg_id, label, status, created_at)
+                   VALUES (?, ?, 'pending', ?)""",
+                (raw, label, datetime.utcnow().isoformat()),
+            )
+            conn.commit()
+        flash(f"Import queued for @{raw}. The userbot will fetch the history shortly.", "success")
+        return redirect(url_for("admin_import_chat"))
+
+    with get_db() as conn:
+        imports = conn.execute(
+            "SELECT * FROM import_requests ORDER BY id DESC"
+        ).fetchall()
+    return render_template("admin/import_chat.html", imports=imports)
+
+
+@app.route("/admin/import-chat/<int:req_id>/status")
+@login_required
+def admin_import_status(req_id):
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM import_requests WHERE id=?", (req_id,)).fetchone()
+    if not row:
+        return jsonify({"error": "Not found"}), 404
+    return jsonify(dict(row))
+
+
 # ─────────────────────────── MAIN ─────────────────────────────────
 
 if __name__ == "__main__":
