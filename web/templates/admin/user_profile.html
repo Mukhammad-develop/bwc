@@ -450,8 +450,17 @@ async function poll() {
       document.getElementById('chatEmpty')?.remove();
 
       data.messages.forEach(msg => {
-        if (!msg.content || msg.content.startsWith('[FILE:')) return; // skip raw file tags for now
-        appendBubble(msg);
+        if (!msg.content) return;
+        // Show user file/voice messages as a placeholder in live view (full UI on refresh)
+        let displayMsg = msg;
+        if (msg.content.startsWith('[FILE:')) {
+          const m = msg.content.match(/^\[FILE:[^:]*:([^:]*):(\w+)\]$/);
+          const filename = m ? m[1] : '';
+          const type = m ? m[2] : '';
+          const label = (type === 'voice' || /\.(oga|ogg|mp3|m4a|webm)$/i.test(filename)) ? 'Voice message' : (filename || 'File');
+          displayMsg = { ...msg, content: label };
+        }
+        appendBubble(displayMsg);
         if (msg.timestamp > lastTs) lastTs = msg.timestamp;
       });
 
