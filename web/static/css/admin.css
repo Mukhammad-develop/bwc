@@ -543,7 +543,8 @@ table.admin-table tr:hover td { background: var(--bg-hover); }
 
 /* Voice message — Telegram-style inline player */
 .msg-voice-bubble {
-  max-width: 320px;
+  max-width: 420px;
+  min-width: 280px;
   padding: 12px 14px;
   background: #e8eef5;
   border: none;
