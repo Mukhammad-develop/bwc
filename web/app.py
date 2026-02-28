@@ -960,7 +960,7 @@ def admin_transcribe_document(doc_id):
             return jsonify({"error": "Access denied"}), 403
 
     # Language hint for Whisper (ISO 639-1); improves accuracy for Uzbek, Russian, etc.
-    lang = (case.get("language") or "").strip().lower()
+    lang = (dict(case).get("language") or "").strip().lower()
     if len(lang) in (2, 3) and lang.isalpha():
         whisper_lang = lang
     else:
