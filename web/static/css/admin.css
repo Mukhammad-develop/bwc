@@ -449,9 +449,9 @@ table.admin-table tr:hover td { background: var(--bg-hover); }
   line-height: 1.55; max-width: 100%; word-break: break-word;
 }
 .chat-msg.user .msg-bubble {
-  background: var(--bg-card); color: var(--text-head);
-  border: 1px solid var(--border); border-bottom-left-radius: 4px;
-  box-shadow: var(--shadow-xs);
+  background: #e8eef5; color: var(--text-head);
+  border: none; border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
 }
 .chat-msg.assistant .msg-bubble {
   background: #3b6ef5; color: #fff; border-bottom-right-radius: 4px;
@@ -517,9 +517,9 @@ table.admin-table tr:hover td { background: var(--bg-hover); }
 /* File attachments in chat */
 .msg-file-bubble {
   display: flex; align-items: center; gap: 10px;
-  background: var(--bg-card); border: 1px solid var(--border);
+  background: #e8eef5; border: none;
   border-radius: var(--radius-lg); padding: 9px 11px;
-  max-width: 320px; box-shadow: var(--shadow-xs);
+  max-width: 320px; box-shadow: 0 1px 2px rgba(0,0,0,.06);
 }
 .chat-msg.assistant .msg-file-bubble,
 .chat-msg.admin     .msg-file-bubble {
@@ -544,25 +544,40 @@ table.admin-table tr:hover td { background: var(--bg-hover); }
 /* Voice message — Telegram-style inline player */
 .msg-voice-bubble {
   max-width: 320px;
-  padding: 10px 12px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
+  padding: 12px 14px;
+  background: #e8eef5;
+  border: none;
+  border-radius: 14px;
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+.chat-msg.assistant .msg-voice-bubble,
+.chat-msg.admin .msg-voice-bubble {
+  background: rgba(59, 110, 245, 0.12);
+  border-bottom-left-radius: 14px;
+  border-bottom-right-radius: 4px;
 }
 .msg-voice-player {
   width: 100%;
-  height: 36px;
-  margin-bottom: 8px;
+  height: 40px;
+  margin-bottom: 10px;
   accent-color: var(--primary);
+  filter: contrast(0.95);
 }
-.msg-voice-player::-webkit-media-controls-panel { background: var(--bg-hover); }
-.msg-voice-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
-.msg-voice-lyrics { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.msg-voice-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.msg-voice-lyrics {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0,0,0,.08);
+}
+.chat-msg.assistant .msg-voice-lyrics,
+.chat-msg.admin .msg-voice-lyrics {
+  border-top-color: rgba(255,255,255,.25);
+}
 .msg-voice-lyrics-label {
   font-size: .65rem;
   font-weight: 700;
-  color: var(--text-faint);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: .05em;
   margin-bottom: 4px;
@@ -570,7 +585,7 @@ table.admin-table tr:hover td { background: var(--bg-hover); }
 .msg-voice-lyrics-text {
   font-size: .8rem;
   color: var(--text-body);
-  line-height: 1.5;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
 }

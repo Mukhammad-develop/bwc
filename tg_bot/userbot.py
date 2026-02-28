@@ -236,17 +236,19 @@ async def handle_media(event):
         media_type = "photo"
     elif isinstance(msg.media, MessageMediaDocument):
         doc = msg.media.document
+        unique_id  = str(uuid.uuid4())
         # Try to get the original filename from attributes
-        filename = None
+        base_name = None
         for attr in doc.attributes:
             if isinstance(attr, DocumentAttributeFilename):
-                filename = attr.file_name
+                base_name = attr.file_name
                 break
-        if not filename:
-            # Guess extension from mime type
+        if not base_name:
             ext = mimetypes.guess_extension(doc.mime_type or "") or ""
-            filename = f"document{ext}"
-        unique_id  = str(uuid.uuid4())
+            base_name = f"document{ext}"
+        # Use unique filename so multiple voice/docs never overwrite the same file
+        ext = (Path(base_name).suffix or "").lower() or ".oga"
+        filename = f"{unique_id}{ext}"
         media_type = "document"
     else:
         # Voice, video notes, stickers etc — ignore silently

@@ -180,6 +180,10 @@
                   {% set entry = none %}
                 {% endif %}
                 {% set is_voice = parsed.filename and parsed.filename.lower().endswith(('.oga','.ogg','.mp3','.m4a','.webm')) %}
+                {# Voice: only use entry when matched by unique_id so each message gets its own file #}
+                {% if is_voice and entry and not (parsed.unique_id and parsed.unique_id in all_docs_by_unique_id) %}
+                  {% set entry = none %}
+                {% endif %}
                 {% if entry and is_voice %}
                 <div class="msg-voice-bubble">
                   <audio controls preload="metadata" class="msg-voice-player"
