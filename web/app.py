@@ -81,6 +81,25 @@ def init_admin_tables():
             created_at   TEXT NOT NULL,
             FOREIGN KEY(recipient_id) REFERENCES admin_users(id) ON DELETE CASCADE
         );
+        CREATE TABLE IF NOT EXISTS import_requests (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_tg_id    TEXT    NOT NULL,
+            label         TEXT    DEFAULT '',
+            status        TEXT    DEFAULT 'pending',
+            message_count INTEGER DEFAULT 0,
+            error_msg     TEXT,
+            created_at    TEXT    NOT NULL,
+            completed_at  TEXT
+        );
+        CREATE TABLE IF NOT EXISTS pending_sends (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_tg_id  TEXT    NOT NULL,
+            message     TEXT    NOT NULL,
+            sender_name TEXT    DEFAULT 'Admin',
+            sent        INTEGER DEFAULT 0,
+            created_at  TEXT    NOT NULL,
+            sent_at     TEXT
+        );
         """)
         conn.commit()
         for col, defval in [
