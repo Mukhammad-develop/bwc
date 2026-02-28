@@ -961,7 +961,8 @@ def admin_transcribe_document(doc_id):
 
     # Get file bytes
     if file_id.startswith("local:"):
-        path = UPLOADS_DIR / Path(filename).name
+        # Path on disk is the part after "local:" (e.g. uuid.oga), not doc filename
+        path = UPLOADS_DIR / Path(file_id[6:]).name
         if not path.exists():
             return jsonify({"error": "File not found on disk"}), 404
         with open(path, "rb") as f:
@@ -1055,9 +1056,26 @@ def admin_user_profile(user_db_id):
             flash("User not found.", "error")
             return redirect(url_for("admin_users"))
 
-        cases = conn.execute(
+        raw_cases = conn.execute(
             "SELECT * FROM cases WHERE user_id=? ORDER BY created_at ASC", (user_db_id,)
         ).fetchall()
+        # Dedupe consecutive identical messages in each case's conversation (fixes double display)
+        def _dedupe_conversation(conv_list):
+            out = []
+            for m in conv_list:
+                if out and out[-1].get("role") == m.get("role") and out[-1].get("content") == m.get("content") and out[-1].get("timestamp") == m.get("timestamp"):
+                    continue
+                out.append(m)
+            return out
+        cases = []
+        for c in raw_cases:
+            c = dict(c)
+            try:
+                conv = json.loads(c.get("conversation_history") or "[]")
+            except Exception:
+                conv = []
+            c["conversation_history"] = json.dumps(_dedupe_conversation(conv))
+            cases.append(c)
 
         all_docs = conn.execute("""
             SELECT d.*, c.service FROM documents d

@@ -190,6 +190,7 @@
                          src="{{ url_for('admin_file_view', file_id=entry.doc.file_id) }}">
                     Your browser does not support audio.
                   </audio>
+                  <div class="msg-voice-load-error" style="display:none;font-size:.75rem;color:var(--text-muted);margin-top:4px">Playback unavailable. Try Download.</div>
                   <div class="msg-voice-actions">
                     <a href="{{ url_for('admin_file_download', file_id=entry.doc.file_id, name=parsed.filename) }}"
                        class="btn btn-ghost btn-sm">Download</a>
@@ -386,6 +387,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Start polling
   startPolling();
 
+  // When voice playback fails, show a friendly message instead of browser "Error"
+  document.querySelectorAll('.msg-voice-player').forEach(a => {
+    a.addEventListener('error', function() {
+      const fallback = this.closest('.msg-voice-bubble')?.querySelector('.msg-voice-load-error');
+      if (fallback) fallback.style.display = 'block';
+    });
+  });
+
   // Generate lyrics (Whisper) for voice messages
   document.querySelectorAll('.btn-transcribe').forEach(btn => {
     btn.addEventListener('click', async function() {
@@ -406,7 +415,7 @@ document.addEventListener('DOMContentLoaded', () => {
           textEl.textContent = data.text;
           wrap.style.display = 'block';
         } else {
-          textEl.textContent = data.error || 'Transcription failed';
+          textEl.textContent = data.error || 'Transcription unavailable. File may be missing or format not supported.';
           wrap.style.display = 'block';
         }
       } catch (e) {
