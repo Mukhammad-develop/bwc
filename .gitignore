@@ -1,27 +1,22 @@
-# Environment & secrets
-.env
-
-# Database
-*.db
-*.sqlite3
-
-# Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
+*.so
 .Python
-*.egg-info/
-dist/
-build/
 venv/
-.venv/
-
-# macOS
-.DS_Store
-
-# Temp
-temp/
-
-# Logs
+env/
+.env
+*.session
+*.session-journal
+db.sqlite3
+staticfiles/
+uploads/
 *.log
+.DS_Store
+sessions/
+tg_bot/venv/
+tg_bot/bot.db
+tg_bot/__pycache__/
+web/__pycache__/
+temp/

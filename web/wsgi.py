@@ -2,6 +2,7 @@
 PythonAnywhere WSGI entry point.
 This file is referenced in the PythonAnywhere web app configuration.
 """
+
 import sys
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ if str(project_home) not in sys.path:
 
 # Load .env from project root
 from dotenv import load_dotenv
+
 load_dotenv(project_home.parent / ".env")
 
 from app import app as application

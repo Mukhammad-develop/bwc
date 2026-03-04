@@ -1,0 +1,110 @@
+{% extends "panel/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+  <div class="stat-card highlight">
+    <div class="stat-label">{% if is_master %}Total Users{% else %}My Users{% endif %}</div>
+    <div class="stat-number">{{ my_users_count }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Total Cases</div>
+    <div class="stat-number">{{ total_cases }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Active</div>
+    <div class="stat-number">{{ active_cases }}</div>
+  </div>
+  <div class="stat-card success">
+    <div class="stat-label">Paid</div>
+    <div class="stat-number">{{ paid_cases }}</div>
+  </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start">
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Recent Cases</h2>
+      <a href="{% url 'panel:cases' %}" class="btn btn-ghost btn-sm">View all →</a>
+    </div>
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>#</th><th>Service</th><th>User</th><th>Status</th><th>Payment</th><th>Date</th><th></th></tr>
+        </thead>
+        <tbody>
+          {% for c in recent_cases %}
+          <tr>
+            <td style="color:#94a3b8">#{{ c.id }}</td>
+            <td><span class="badge badge-{{ c.service }}">{{ c.service|title }}</span></td>
+            <td>
+              <a href="{% url 'panel:user_profile' c.user_id %}" style="color:#2563eb;text-decoration:none;font-size:.8rem">
+                {{ c.user.tg_id }}
+              </a>
+            </td>
+            <td><span class="status-badge status-{{ c.status }}">{{ c.status }}</span></td>
+            <td><span class="status-badge status-{{ c.payment_status }}">{{ c.payment_status }}</span></td>
+            <td style="color:#94a3b8;font-size:.75rem">{{ c.created_at|date:"Y-m-d" }}</td>
+            <td><a href="{% url 'panel:case_detail' c.id %}" class="btn btn-primary btn-sm">View</a></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" style="text-align:center;color:#94a3b8;padding:24px">No cases yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:20px">
+    <div class="card">
+      <div class="card-header"><h3>Cases by Service</h3></div>
+      <div class="card-body">
+        <div class="bar-chart">
+          {% for s in by_service %}
+          <div class="bar-row">
+            <div class="bar-label">{{ s.service|title }}</div>
+            <div class="bar-track">
+              <div class="bar-fill fill-{{ s.service }}" style="width:{{ s.cnt }}0%"></div>
+            </div>
+            <div class="bar-count">{{ s.cnt }}</div>
+          </div>
+          {% empty %}
+          <p style="color:#94a3b8;font-size:.8rem">No data.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    {% if is_master and latest_report %}
+    <div class="card">
+      <div class="card-header">
+        <h3>Latest Report</h3>
+        <a href="{% url 'panel:reports' %}" class="btn btn-ghost btn-sm">All →</a>
+      </div>
+      <div class="card-body">
+        <div style="margin-bottom:8px">
+          <span class="status-badge r-type-{{ latest_report.report_type }}">{{ latest_report.report_type|upper }}</span>
+          <span style="font-size:.75rem;color:#94a3b8;margin-left:8px">{{ latest_report.created_at|date:"Y-m-d" }}</span>
+        </div>
+        {% if latest_report.ai_conclusion %}
+        <p style="font-size:.8rem;color:#374151;line-height:1.6">
+          {{ latest_report.ai_conclusion|truncatechars:300 }}
+        </p>
+        {% endif %}
+        <a href="{% url 'panel:report_detail' latest_report.id %}" class="btn btn-primary btn-sm" style="margin-top:10px">Full report →</a>
+      </div>
+    </div>
+    {% elif is_master %}
+    <div class="card">
+      <div class="card-body" style="text-align:center">
+        <p style="color:#94a3b8;font-size:.85rem;margin-bottom:12px">No reports generated yet.</p>
+        <a href="{% url 'panel:reports' %}" class="btn btn-primary btn-sm">Generate first report →</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

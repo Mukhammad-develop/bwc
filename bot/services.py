@@ -4,13 +4,18 @@ Imported by both bot.py (telebot) and userbot.py (Telethon).
 """
 
 import os
+import django
 from pathlib import Path
-from dotenv import load_dotenv
 
-load_dotenv()
-load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+# Bootstrap Django if not yet set up (needed when running bot as standalone process)
+if not os.environ.get("DJANGO_SETTINGS_MODULE"):
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "bwc.settings")
+    import sys
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    django.setup()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
+from django.conf import settings
+OPENAI_API_KEY = settings.OPENAI_API_KEY
 
 # ─────────────────────────── TRANSLATIONS ────────────────────────────────────
 

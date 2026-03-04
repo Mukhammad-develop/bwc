@@ -1,0 +1,74 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports & Analytics{% endblock %}
+{% block nav_reports %}active{% endblock %}
+
+{% block content %}
+<div class="card" style="margin-bottom:20px">
+  <div class="card-header">
+    <h2>Live Stats (last 24h)</h2>
+    <span style="font-size:.75rem;color:#94a3b8">Auto-computed · Updated on every page load</span>
+  </div>
+  <div class="card-body">
+    <div class="mini-stat-row">
+      <div class="mini-stat"><div class="ms-label">New Users</div><div class="ms-value">{{ today_stats.new_users }}</div></div>
+      <div class="mini-stat"><div class="ms-label">New Cases</div><div class="ms-value">{{ today_stats.new_cases }}</div></div>
+      <div class="mini-stat"><div class="ms-label">Payments</div><div class="ms-value">{{ today_stats.paid }}</div></div>
+      <div class="mini-stat"><div class="ms-label">Completed</div><div class="ms-value">{{ today_stats.completed }}</div></div>
+      <div class="mini-stat"><div class="ms-label">Active Cases</div><div class="ms-value">{{ today_stats.active }}</div></div>
+      <div class="mini-stat"><div class="ms-label">Files Uploaded</div><div class="ms-value">{{ today_stats.docs }}</div></div>
+    </div>
+    {% if today_stats.by_service %}
+    <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px">
+      {% for svc, cnt in today_stats.by_service.items %}
+      <span class="badge badge-{{ svc }}">{{ svc|title }}: {{ cnt }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<h2 style="font-size:1rem;font-weight:700;margin-bottom:14px;color:#0f172a">Generate AI Report</h2>
+<div class="reports-grid" style="margin-bottom:28px">
+  {% for rtype, label, desc in report_types %}
+  <div class="report-gen-card">
+    <h3>{{ label }}</h3>
+    <p>{{ desc }}</p>
+    <form method="POST" action="{% url 'panel:generate_report' rtype %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">Generate</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+
+<h2 style="font-size:1rem;font-weight:700;margin-bottom:14px;color:#0f172a">Report History</h2>
+{% if reports %}
+  {% for r in reports %}
+  {% with stats=r.get_stats %}
+  <a href="{% url 'panel:report_detail' r.id %}" class="report-list-item" style="display:flex">
+    <span class="r-type-badge r-type-{{ r.report_type }}">{{ r.report_type|upper }}</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:600;font-size:.875rem">{{ r.report_type|title }} Report</div>
+      <div style="font-size:.75rem;color:#94a3b8">
+        {{ r.period_start|date:"Y-m-d" }} → {{ r.period_end|date:"Y-m-d" }}
+      </div>
+    </div>
+    <div class="mini-stat-row" style="margin-bottom:0;gap:6px">
+      <div class="mini-stat" style="padding:4px 10px"><div class="ms-label">Users</div><div class="ms-value" style="font-size:1rem">{{ stats.new_users|default:"?" }}</div></div>
+      <div class="mini-stat" style="padding:4px 10px"><div class="ms-label">Cases</div><div class="ms-value" style="font-size:1rem">{{ stats.new_cases|default:"?" }}</div></div>
+      <div class="mini-stat" style="padding:4px 10px"><div class="ms-label">Paid</div><div class="ms-value" style="font-size:1rem">{{ stats.paid|default:"?" }}</div></div>
+    </div>
+    <div style="display:flex;align-items:center;padding-left:10px;color:#94a3b8">→</div>
+  </a>
+  {% endwith %}
+  {% endfor %}
+{% else %}
+  <div class="empty-state">
+    <div class="es-icon">📈</div>
+    <h3>No reports yet</h3>
+    <p>Generate your first report above.</p>
+  </div>
+{% endif %}
+{% endblock %}

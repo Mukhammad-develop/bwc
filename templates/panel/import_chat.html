@@ -1,0 +1,122 @@
+{% extends "panel/base.html" %}
+{% block title %}Import Chat{% endblock %}
+{% block page_title %}Import Old Chats{% endblock %}
+{% block nav_import %}active{% endblock %}
+
+{% block content %}
+<div style="max-width:780px">
+
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-body" style="display:flex;gap:16px;align-items:flex-start">
+      <div>
+        <div style="font-weight:700;color:var(--text-head);margin-bottom:4px">Import existing Telegram conversation</div>
+        <div style="font-size:.83rem;color:var(--text-muted);line-height:1.6">
+          Enter the Telegram user ID (or @username) of a client whose conversation with your
+          personal Telegram account happened <em>before</em> the userbot was connected.
+          The userbot will fetch the full message history and import it into the admin panel.
+        </div>
+        <div style="margin-top:10px;padding:10px 12px;background:var(--warning-tint);border-radius:var(--radius-md);font-size:.8rem;color:var(--warning)">
+          <strong>Important:</strong> The Telegram userbot (<code>python bot/userbot.py</code>) must be running.
+          If it is not running, imports will stay in Pending.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:24px">
+    <div class="card-header"><h2>Queue New Import</h2></div>
+    <div class="card-body">
+      <form method="POST">
+        {% csrf_token %}
+        <div class="form-row" style="margin-bottom:16px">
+          <div class="form-group" style="margin-bottom:0">
+            <label>Telegram User ID or @username</label>
+            <input type="text" name="tg_id" placeholder="e.g. 1927099919 or @username" required>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label>Label <span style="font-weight:400;color:var(--text-faint)">(optional)</span></label>
+            <input type="text" name="label" placeholder="e.g. PAYE client — Amir">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Queue Import</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Import History</h2>
+      <span style="font-size:.78rem;color:var(--text-faint)">{{ imports|length }} total</span>
+    </div>
+    {% if imports %}
+    <div class="table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>#</th><th>Telegram ID</th><th>Label</th><th>Status</th><th>Messages</th><th>Queued</th><th>Completed</th></tr>
+        </thead>
+        <tbody>
+          {% for imp in imports %}
+          <tr id="import-row-{{ imp.id }}">
+            <td style="color:var(--text-faint)">#{{ imp.id }}</td>
+            <td style="font-weight:600">{{ imp.user_tg_id }}</td>
+            <td style="color:var(--text-muted)">{{ imp.label|default:"—" }}</td>
+            <td>
+              {% if imp.status == 'done' %}<span class="status-badge status-completed">Done</span>
+              {% elif imp.status == 'pending' %}<span class="status-badge status-pending import-pending" data-id="{{ imp.id }}">Pending</span>
+              {% elif imp.status == 'processing' %}<span class="status-badge status-active import-pending" data-id="{{ imp.id }}">Processing…</span>
+              {% elif imp.status == 'error' %}<span class="status-badge status-cancelled" title="{{ imp.error_msg|default:'' }}">Error</span>
+              {% endif %}
+            </td>
+            <td><span id="import-count-{{ imp.id }}">{{ imp.message_count|default:"—" }}</span></td>
+            <td style="font-size:.75rem;color:var(--text-faint)">{{ imp.created_at|date:"Y-m-d H:i" }}</td>
+            <td style="font-size:.75rem;color:var(--text-faint)">
+              {% if imp.completed_at %}{{ imp.completed_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% if imp.status == 'error' and imp.error_msg %}
+          <tr><td colspan="7" style="padding:4px 14px 10px;font-size:.75rem;color:var(--danger)">{{ imp.error_msg }}</td></tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card-body">
+      <p style="color:var(--text-faint);font-size:.85rem;text-align:center;padding:20px 0">
+        No imports yet. Use the form above to queue your first one.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function pollPending() {
+  document.querySelectorAll('.import-pending').forEach(el => {
+    const id = el.getAttribute('data-id');
+    fetch(`/admin/import-chat/${id}/status`, {credentials:'same-origin'})
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === 'done') {
+          el.className   = 'status-badge status-completed';
+          el.textContent = 'Done';
+          el.classList.remove('import-pending');
+          const cnt = document.getElementById('import-count-' + id);
+          if (cnt) cnt.textContent = data.message_count || 0;
+        } else if (data.status === 'error') {
+          el.className   = 'status-badge status-cancelled';
+          el.textContent = 'Error';
+          el.classList.remove('import-pending');
+          el.title = data.error_msg || '';
+        } else if (data.status === 'processing') {
+          el.textContent = 'Processing…';
+        }
+      }).catch(() => {});
+  });
+}
+if (document.querySelector('.import-pending')) setInterval(pollPending, 4000);
+</script>
+{% endblock %}

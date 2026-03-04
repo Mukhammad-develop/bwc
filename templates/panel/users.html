@@ -1,0 +1,67 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Users{% endblock %}
+{% block page_title %}Users{% endblock %}
+{% block nav_users %}active{% endblock %}
+
+{% block content %}
+<div style="margin-bottom:16px;display:flex;align-items:center;justify-content:space-between">
+  <span style="font-size:.85rem;color:#64748b">{{ users|length }} user(s)</span>
+</div>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>Telegram ID</th>
+          <th>Language</th>
+          <th>AI Name</th>
+          <th>Nationality</th>
+          <th>Service Interest</th>
+          <th>Cases</th>
+          <th>Files</th>
+          <th>Joined</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in users %}
+        {% with u=row.user prof=row.profile %}
+        <tr>
+          <td>
+            <a href="{% url 'panel:user_profile' u.id %}" style="color:#2563eb;text-decoration:none;font-weight:700">
+              @{{ u.tg_id }}
+            </a>
+          </td>
+          <td style="font-size:.8rem">{{ u.language|upper|default:"–" }}</td>
+          <td style="font-size:.8rem;color:#374151">
+            {{ prof.full_name|default:"" }}
+            {% if not prof.full_name %}<span style="color:#cbd5e1;font-style:italic">–</span>{% endif %}
+          </td>
+          <td style="font-size:.8rem;color:#374151">{{ prof.nationality|default:"–" }}</td>
+          <td style="font-size:.8rem;color:#374151">{{ prof.service_interest|default:"–" }}</td>
+          <td><span class="badge badge-default">{{ u.case_count }}</span></td>
+          <td><span class="badge badge-default">{{ u.doc_count }}</span></td>
+          <td style="font-size:.75rem;color:#94a3b8">{{ u.created_at|date:"Y-m-d"|default:"–" }}</td>
+          <td>
+            <a href="{% url 'panel:user_profile' u.id %}" class="btn btn-primary btn-sm">View Profile</a>
+          </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr>
+          <td colspan="9">
+            <div class="empty-state" style="padding:40px">
+              <div class="es-icon" style="font-size:2rem;opacity:.3">—</div>
+              <h3>No users yet</h3>
+              <p>Users will appear here after they start the Telegram bot.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

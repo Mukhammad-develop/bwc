@@ -1,0 +1,150 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}Team Management{% endblock %}
+{% block page_title %}Team Management{% endblock %}
+{% block nav_admins %}active{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 360px;gap:20px;align-items:start">
+
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h2>Admin Accounts</h2>
+        <span style="font-size:.8rem;color:#94a3b8">{{ admins|length }} account(s)</span>
+      </div>
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Username</th><th>Display Name</th><th>Role</th><th>Assigned Users</th><th>Created</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for a in admins %}
+            <tr>
+              <td style="font-weight:700">{{ a.username }}</td>
+              <td>{{ a.display_name|default:"–" }}</td>
+              <td>
+                {% if a.role == 'master' %}<span class="badge admin-role-master">Master</span>
+                {% elif a.role == 'admin' %}<span class="badge admin-role-admin">Admin</span>
+                {% else %}<span class="badge admin-role-consultant">Consultant</span>{% endif %}
+              </td>
+              <td><span class="badge badge-default">{{ a.assigned_count }}</span></td>
+              <td style="font-size:.75rem;color:#94a3b8">{{ a.created_at|date:"Y-m-d" }}</td>
+              <td>
+                {% if a.role != 'master' %}
+                <form method="POST" action="{% url 'panel:delete_admin' a.id %}"
+                      onsubmit="return confirm('Delete {{ a.username }}? This will remove all their assignments.')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                </form>
+                {% else %}
+                <span style="font-size:.75rem;color:#94a3b8">Protected</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6">
+              <div class="empty-state" style="padding:30px">
+                <h3>No accounts yet</h3>
+                <p>Add accounts using the form.</p>
+              </div>
+            </td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <div class="card-header">
+        <h2>User Assignments</h2>
+        <span style="font-size:.8rem;color:#94a3b8">Assign users to consultants</span>
+      </div>
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr><th>Telegram ID</th><th>Name</th><th>Assigned To</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for u in all_users %}
+            {% with prof=u.ai_profile.get_data %}
+            <tr>
+              <td style="font-weight:600">@{{ u.tg_id }}</td>
+              <td style="font-size:.8rem;color:#374151">{{ prof.full_name|default:"–" }}</td>
+              <td style="font-size:.8rem;color:#64748b">
+                <a href="{% url 'panel:user_profile' u.id %}" style="color:#2563eb;text-decoration:none">Manage →</a>
+              </td>
+              <td><a href="{% url 'panel:user_profile' u.id %}" class="btn btn-ghost btn-sm">👤</a></td>
+            </tr>
+            {% endwith %}
+            {% empty %}
+            <tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:20px">No users yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-header"><h3>Add Account</h3></div>
+      <div class="card-body">
+        <form method="POST" action="{% url 'panel:add_admin' %}">
+          {% csrf_token %}
+          <div class="form-group">
+            <label>Username *</label>
+            <input type="text" name="username" required placeholder="e.g. john_smith">
+          </div>
+          <div class="form-group">
+            <label>Display Name</label>
+            <input type="text" name="display_name" placeholder="e.g. John Smith">
+          </div>
+          <div class="form-group">
+            <label>Password *</label>
+            <input type="password" name="password" required placeholder="Strong password">
+          </div>
+          <div class="form-group">
+            <label>Role</label>
+            <select name="role">
+              <option value="consultant">Consultant</option>
+              <option value="admin">Admin</option>
+              <option value="master">Master Admin</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Create Account</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-header"><h3>Role Permissions</h3></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:16px">
+        <div>
+          <span class="badge admin-role-master" style="margin-bottom:6px;display:inline-block">Master Admin</span>
+          <ul style="font-size:.8rem;color:#475569;padding-left:18px;line-height:1.8;margin:0">
+            <li>Full access to everything</li><li>Create, edit, delete any admin account</li>
+            <li>Manage user assignments</li><li>Generate & view AI reports</li>
+            <li>Update case & payment statuses</li>
+          </ul>
+        </div>
+        <div>
+          <span class="badge admin-role-admin" style="margin-bottom:6px;display:inline-block">Admin</span>
+          <ul style="font-size:.8rem;color:#475569;padding-left:18px;line-height:1.8;margin:0">
+            <li>View all users, cases & chats</li><li>View & download all files</li>
+            <li>View & generate AI reports</li><li><strong>Cannot</strong> manage admin accounts</li>
+          </ul>
+        </div>
+        <div>
+          <span class="badge admin-role-consultant" style="margin-bottom:6px;display:inline-block">Consultant</span>
+          <ul style="font-size:.8rem;color:#475569;padding-left:18px;line-height:1.8;margin:0">
+            <li>View only <strong>assigned</strong> users & cases</li>
+            <li>Send messages to assigned users</li>
+            <li><strong>Cannot</strong> access reports or admin management</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

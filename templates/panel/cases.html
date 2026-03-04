@@ -1,0 +1,73 @@
+{% extends "panel/base.html" %}
+{% block title %}Cases{% endblock %}
+{% block page_title %}Cases{% endblock %}
+{% block nav_cases %}active{% endblock %}
+
+{% block content %}
+<form method="GET" class="filter-bar">
+  <select name="service" onchange="this.form.submit()">
+    <option value="">All services</option>
+    {% for s in 'student,paye,self,company'|split:',' %}
+    <option value="{{ s }}" {% if filter_service == s %}selected{% endif %}>{{ s|title }}</option>
+    {% endfor %}
+  </select>
+  <select name="status" onchange="this.form.submit()">
+    <option value="">All statuses</option>
+    {% for s in 'active,completed,cancelled'|split:',' %}
+    <option value="{{ s }}" {% if filter_status == s %}selected{% endif %}>{{ s|title }}</option>
+    {% endfor %}
+  </select>
+  <select name="payment" onchange="this.form.submit()">
+    <option value="">All payments</option>
+    {% for s in 'pending,received,refunded'|split:',' %}
+    <option value="{{ s }}" {% if filter_payment == s %}selected{% endif %}>{{ s|title }}</option>
+    {% endfor %}
+  </select>
+  {% if filter_service or filter_status or filter_payment %}
+  <a href="{% url 'panel:cases' %}" class="btn btn-ghost btn-sm">Clear</a>
+  {% endif %}
+  <span style="margin-left:auto;font-size:.8rem;color:#94a3b8">{{ cases|length }} case(s)</span>
+</form>
+
+<div class="card">
+  <div class="table-wrap">
+    <table class="admin-table">
+      <thead>
+        <tr>
+          <th>#</th><th>Service</th><th>User</th><th>Language</th>
+          <th>Status</th><th>Payment</th><th>Created</th><th>Updated</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in cases %}
+        <tr>
+          <td style="color:#94a3b8">#{{ c.id }}</td>
+          <td><span class="badge badge-{{ c.service }}">{{ c.service|title }}</span></td>
+          <td>
+            <a href="{% url 'panel:user_profile' c.user_id %}" style="color:#2563eb;text-decoration:none;font-weight:600;font-size:.8rem">
+              @{{ c.user.tg_id }}
+            </a>
+          </td>
+          <td style="font-size:.8rem;color:#64748b">{{ c.user.language|upper }}</td>
+          <td><span class="status-badge status-{{ c.status }}">{{ c.status }}</span></td>
+          <td><span class="status-badge status-{{ c.payment_status }}">{{ c.payment_status }}</span></td>
+          <td style="font-size:.75rem;color:#94a3b8">{{ c.created_at|date:"Y-m-d" }}</td>
+          <td style="font-size:.75rem;color:#94a3b8">{{ c.updated_at|date:"Y-m-d" }}</td>
+          <td><a href="{% url 'panel:case_detail' c.id %}" class="btn btn-primary btn-sm">Open</a></td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9">
+            <div class="empty-state" style="padding:40px">
+              <div class="es-icon">📭</div>
+              <h3>No cases found</h3>
+              <p>Try changing the filters above.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

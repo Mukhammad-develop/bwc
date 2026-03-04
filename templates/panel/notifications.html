@@ -1,0 +1,49 @@
+{% extends "panel/base.html" %}
+{% block title %}Notifications{% endblock %}
+{% block page_title %}Notifications{% endblock %}
+
+{% block topbar_actions %}
+{% if notifications %}
+<form method="POST" action="{% url 'panel:notif_read_all' %}" style="margin:0">
+  {% csrf_token %}
+  <button class="btn btn-ghost btn-sm">Mark all read</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width:680px;margin:0 auto">
+  <div class="card">
+    <div class="card-header">
+      <h3>Notifications</h3>
+      <span style="font-size:.8rem;color:#94a3b8">{{ notifications|length }} item(s)</span>
+    </div>
+
+    {% if notifications %}
+    <div>
+      {% for n in notifications %}
+      <div class="notif-full-item {% if not n.is_read %}unread{% endif %}">
+        <div class="notif-full-icon">{% if not n.is_read %}🔵{% else %}📋{% endif %}</div>
+        <div class="notif-full-body">
+          <div class="notif-full-title">{{ n.title }}</div>
+          <div class="notif-full-msg">{{ n.message }}</div>
+          <div class="notif-full-meta">
+            <span class="notif-full-time">{{ n.created_at|date:"Y-m-d H:i" }}</span>
+            {% if n.link %}
+            · <a href="{{ n.link }}" style="font-size:.72rem;color:#6366f1;text-decoration:none">View →</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state" style="padding:60px 20px">
+      <div class="es-icon">🔔</div>
+      <h3>All caught up</h3>
+      <p>No notifications yet.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

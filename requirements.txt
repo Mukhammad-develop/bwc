@@ -1,0 +1,6 @@
+django>=4.2
+python-dotenv>=1.0.1
+requests>=2.31
+openai>=1.0.0
+pyTelegramBotAPI>=4.16.1
+telethon>=1.36

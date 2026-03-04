@@ -39,16 +39,16 @@ sys.path.insert(0, str(ROOT))
 import db
 from services import t, detect_service, ask_ai
 
-DB_PATH     = os.getenv("DB_PATH", "bot.db")
-_raw        = DB_PATH
-DB_PATH     = _raw if _raw.startswith("/") else str(ROOT / "bot.db")
+DB_PATH = os.getenv("DB_PATH", "bot.db")
+_raw = DB_PATH
+DB_PATH = _raw if _raw.startswith("/") else str(ROOT / "bot.db")
 
-API_ID      = int(os.getenv("TG_API_ID",   "30176806"))
-API_HASH    = os.getenv("TG_API_HASH",      "dade2446e3317ce1de17b0d0cf45ef4a")
-PHONE       = os.getenv("TG_PHONE",         "").strip()   # e.g. +998901234567
-PHONE_2     = os.getenv("TG_PHONE_2",       "").strip()   # second account (optional)
-SESSION     = str(ROOT / "userbot")
-SESSION_2   = str(ROOT / os.getenv("TG_SESSION_2", "userbot2"))
+API_ID = int(os.getenv("TG_API_ID", "30176806"))
+API_HASH = os.getenv("TG_API_HASH", "dade2446e3317ce1de17b0d0cf45ef4a")
+PHONE = os.getenv("TG_PHONE", "").strip()  # e.g. +998901234567
+PHONE_2 = os.getenv("TG_PHONE_2", "").strip()  # second account (optional)
+SESSION = str(ROOT / "userbot")
+SESSION_2 = str(ROOT / os.getenv("TG_SESSION_2", "userbot2"))
 
 UPLOADS_DIR = ROOT / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
@@ -58,11 +58,12 @@ db.init_db(DB_PATH)
 # Two Telegram accounts: same handlers, replies go from the account that received the chat
 client1 = TelegramClient(SESSION, API_ID, API_HASH)
 client2 = TelegramClient(SESSION_2, API_ID, API_HASH)
-CLIENTS  = [client1, client2]
+CLIENTS = [client1, client2]
 executor = ThreadPoolExecutor(max_workers=4)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def run_sync(fn, *args):
     """Run a blocking function in the thread-pool so the event loop stays free."""
@@ -85,7 +86,7 @@ def lang_buttons():
     return [
         [
             Button.inline("🇬🇧 English", b"lang_en"),
-            Button.inline("🇺🇿 O'zbek",  b"lang_uz"),
+            Button.inline("🇺🇿 O'zbek", b"lang_uz"),
             Button.inline("🇷🇺 Русский", b"lang_ru"),
         ]
     ]
@@ -105,8 +106,12 @@ async def safe_typing(event):
 
 class _NullContext:
     """No-op async context manager used as a fallback when typing fails."""
-    async def __aenter__(self): return self
-    async def __aexit__(self, *_): pass
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        pass
 
 
 async def safe_send(event, text, **kwargs):
@@ -120,10 +125,15 @@ async def safe_send(event, text, **kwargs):
 
 # ── Register handlers for one client (account_index 0 or 1) ───────────────────
 
+
 def register_handlers(client, account_index: int):
     """Attach all message handlers to this client; user is linked to this account."""
 
-    @client.on(events.NewMessage(pattern=r"^/start$", incoming=True, func=lambda e: e.is_private))
+    @client.on(
+        events.NewMessage(
+            pattern=r"^/start$", incoming=True, func=lambda e: e.is_private
+        )
+    )
     async def handle_start(event):
         tg_id = event.sender_id
         with db.connect(DB_PATH) as conn:
@@ -132,7 +142,11 @@ def register_handlers(client, account_index: int):
             lang = db.get_language(conn, tg_id)
         await safe_send(event, t(lang, "welcome"), buttons=lang_buttons())
 
-    @client.on(events.NewMessage(pattern=r"^/help$", incoming=True, func=lambda e: e.is_private))
+    @client.on(
+        events.NewMessage(
+            pattern=r"^/help$", incoming=True, func=lambda e: e.is_private
+        )
+    )
     async def handle_help(event):
         tg_id = event.sender_id
         async with await safe_typing(event):
@@ -142,26 +156,33 @@ def register_handlers(client, account_index: int):
                 lang = db.get_language(conn, tg_id)
         await safe_send(event, t(lang, "help_text"))
 
-    @client.on(events.NewMessage(pattern=r"^/(mycase|case)$", incoming=True, func=lambda e: e.is_private))
+    @client.on(
+        events.NewMessage(
+            pattern=r"^/(mycase|case)$", incoming=True, func=lambda e: e.is_private
+        )
+    )
     async def handle_mycase(event):
         tg_id = event.sender_id
         async with await safe_typing(event):
             with db.connect(DB_PATH) as conn:
-                user_id   = db.get_or_create_user(conn, tg_id)
+                user_id = db.get_or_create_user(conn, tg_id)
                 db.set_user_linked_account(conn, tg_id, account_index)
-                lang      = db.get_language(conn, tg_id)
-                case      = db.get_active_case(conn, user_id)
+                lang = db.get_language(conn, tg_id)
+                case = db.get_active_case(conn, user_id)
                 doc_count = len(db.list_documents(conn, case["id"])) if case else 0
         if not case or not case["service"]:
             await safe_send(event, t(lang, "case_none"))
             return
         await safe_send(
             event,
-            t(lang, "case_info",
-              service=case["service"],
-              status=case["status"],
-              payment=case["payment_status"],
-              doc_count=doc_count),
+            t(
+                lang,
+                "case_info",
+                service=case["service"],
+                status=case["status"],
+                payment=case["payment_status"],
+                doc_count=doc_count,
+            ),
         )
 
     @client.on(events.CallbackQuery(func=lambda e: e.is_private))
@@ -180,26 +201,32 @@ def register_handlers(client, account_index: int):
                 await safe_send(event, t(lang_code, "intro"))
         await event.answer()
 
-    @client.on(events.NewMessage(
-        incoming=True,
-        func=lambda e: e.is_private and not e.message.media and not (e.message.text or "").startswith("/")
-    ))
+    @client.on(
+        events.NewMessage(
+            incoming=True,
+            func=lambda e: e.is_private
+            and not e.message.media
+            and not (e.message.text or "").startswith("/"),
+        )
+    )
     async def handle_text(event):
         tg_id = event.sender_id
-        text  = (event.message.text or "").strip()
+        text = (event.message.text or "").strip()
         if not text:
             return
         lang = "en"
         case = None
         async with await safe_typing(event):
             with db.connect(DB_PATH) as conn:
-                user_id  = db.get_or_create_user(conn, tg_id)
+                user_id = db.get_or_create_user(conn, tg_id)
                 db.set_user_linked_account(conn, tg_id, account_index)
-                lang     = db.get_language(conn, tg_id)
-                case     = db.get_active_case(conn, user_id)
+                lang = db.get_language(conn, tg_id)
+                case = db.get_active_case(conn, user_id)
                 detected = detect_service(text)
-                service  = detected or (case["service"] if case and case["service"] else "general")
-                case     = _get_or_open_case(conn, user_id, service)
+                service = detected or (
+                    case["service"] if case and case["service"] else "general"
+                )
+                case = _get_or_open_case(conn, user_id, service)
                 db.add_conversation_message(conn, case["id"], "user", text)
                 conversation = db.get_conversation(conn, case["id"])
             reply = await asyncio.get_event_loop().run_in_executor(
@@ -212,20 +239,21 @@ def register_handlers(client, account_index: int):
             else:
                 await safe_send(event, t(lang, "ai_error"))
 
-    @client.on(events.NewMessage(
-        incoming=True,
-        func=lambda e: e.is_private and bool(e.message.media)
-    ))
+    @client.on(
+        events.NewMessage(
+            incoming=True, func=lambda e: e.is_private and bool(e.message.media)
+        )
+    )
     async def handle_media(event):
         tg_id = event.sender_id
-        msg   = event.message
+        msg = event.message
         if isinstance(msg.media, MessageMediaPhoto):
-            unique_id  = str(uuid.uuid4())
-            filename   = f"{unique_id}.jpg"
+            unique_id = str(uuid.uuid4())
+            filename = f"{unique_id}.jpg"
             media_type = "photo"
         elif isinstance(msg.media, MessageMediaDocument):
             doc = msg.media.document
-            unique_id  = str(uuid.uuid4())
+            unique_id = str(uuid.uuid4())
             base_name = None
             for attr in doc.attributes:
                 if isinstance(attr, DocumentAttributeFilename):
@@ -247,21 +275,30 @@ def register_handlers(client, account_index: int):
                 await msg.download_media(file=str(dest_path))
             except Exception as e:
                 print(f"[Userbot] download error: {e}")
-                filename  = f"file_{unique_id}"
+                filename = f"file_{unique_id}"
                 dest_path = UPLOADS_DIR / filename
-            file_id  = f"local:{filename}"
+            file_id = f"local:{filename}"
             file_uid = unique_id
             with db.connect(DB_PATH) as conn:
-                user_id  = db.get_or_create_user(conn, tg_id)
+                user_id = db.get_or_create_user(conn, tg_id)
                 db.set_user_linked_account(conn, tg_id, account_index)
-                lang     = db.get_language(conn, tg_id)
-                case     = db.get_active_case(conn, user_id)
+                lang = db.get_language(conn, tg_id)
+                case = db.get_active_case(conn, user_id)
                 if not case or not case["service"]:
                     case = _get_or_open_case(conn, user_id, "general")
-                db.add_document(conn, case["id"], filename, file_id, file_uid,
-                                filename=filename, media_type=media_type)
+                db.add_document(
+                    conn,
+                    case["id"],
+                    filename,
+                    file_id,
+                    file_uid,
+                    filename=filename,
+                    media_type=media_type,
+                )
                 db.add_conversation_message(
-                    conn, case["id"], "user",
+                    conn,
+                    case["id"],
+                    "user",
                     f"[FILE:{file_uid}:{filename}:{media_type}]",
                 )
                 conversation = db.get_conversation(conn, case["id"])
@@ -277,6 +314,7 @@ def register_handlers(client, account_index: int):
 
 
 # ── Chat import loop (uses first account) ─────────────────────────────────────
+
 
 async def process_import(req_id: int, user_tg_id: str):
     """
@@ -307,12 +345,14 @@ async def process_import(req_id: int, user_tg_id: str):
         if not text and not has_media:
             continue
         role = "admin" if msg.out else "user"
-        ts   = msg.date.isoformat() if msg.date else _now_iso_sync()
+        ts = msg.date.isoformat() if msg.date else _now_iso_sync()
         content = text if text else "[media attachment]"
         conv.append({"role": role, "content": content, "timestamp": ts})
 
     with db.connect(DB_PATH) as conn:
-        user_db_id = db.get_or_create_user(conn, int(user_tg_id) if str(user_tg_id).lstrip("-").isdigit() else 0)
+        user_db_id = db.get_or_create_user(
+            conn, int(user_tg_id) if str(user_tg_id).lstrip("-").isdigit() else 0
+        )
         # Use an existing case or create a new one tagged as imported
         case_id = db.create_case(conn, user_db_id, "general")
         db.update_case(conn, case_id, conversation_history=json.dumps(conv))
@@ -323,6 +363,7 @@ async def process_import(req_id: int, user_tg_id: str):
 
 def _now_iso_sync() -> str:
     from datetime import datetime
+
     return datetime.utcnow().isoformat()
 
 
@@ -345,6 +386,7 @@ async def import_queue_loop():
 
 # ── Admin → user send-queue loop (per-account) ────────────────────────────────
 
+
 async def send_queue_loop():
     """Poll pending_sends and send via the correct account (0 or 1)."""
     print("[Userbot] send_queue_loop started (2 accounts)")
@@ -362,12 +404,15 @@ async def send_queue_loop():
                             db.mark_send_done(conn, row["id"])
                         print(f"[Userbot] account {account_index} → {tg_id}")
                     except Exception as e:
-                        print(f"[Userbot] send_queue error account {account_index} {row['user_tg_id']}: {e}")
+                        print(
+                            f"[Userbot] send_queue error account {account_index} {row['user_tg_id']}: {e}"
+                        )
         except Exception as e:
             print(f"[Userbot] send_queue_loop error: {e}")
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
+
 
 async def main():
     if not API_ID or not API_HASH:

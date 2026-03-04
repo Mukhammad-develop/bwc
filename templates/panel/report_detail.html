@@ -1,0 +1,84 @@
+{% extends "panel/base.html" %}
+{% load panel_tags %}
+{% block title %}{{ report.report_type|title }} Report{% endblock %}
+{% block page_title %}{{ report.report_type|title }} Report — {{ report.period_start|date:"Y-m-d" }}{% endblock %}
+{% block nav_reports %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{% url 'panel:reports' %}" class="btn btn-ghost btn-sm">← All reports</a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;align-items:start">
+
+  <div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-header">
+        <h2>AI Business Conclusion</h2>
+        <span class="r-type-badge r-type-{{ report.report_type }}">{{ report.report_type|upper }}</span>
+      </div>
+      <div class="card-body">
+        {% if report.ai_conclusion %}
+        <div class="conclusion-box">{{ report.ai_conclusion }}</div>
+        {% else %}
+        <div class="empty-state" style="padding:30px">
+          <div class="es-icon">🤖</div>
+          <h3>No AI conclusion</h3>
+          <p>OpenAI API key was not set when this report was generated.</p>
+        </div>
+        {% endif %}
+        <div style="margin-top:12px;font-size:.75rem;color:#94a3b8">
+          Generated: {{ report.created_at|date:"Y-m-d H:i" }} UTC ·
+          Period: {{ report.period_start|date:"Y-m-d" }} → {{ report.period_end|date:"Y-m-d" }}
+        </div>
+      </div>
+    </div>
+
+    {% if stats.by_service %}
+    <div class="card">
+      <div class="card-header"><h3>Cases by Service</h3></div>
+      <div class="card-body">
+        <div class="bar-chart">
+          {% for svc, cnt in stats.by_service.items %}
+          <div class="bar-row">
+            <div class="bar-label">{{ svc|title }}</div>
+            <div class="bar-track">
+              <div class="bar-fill fill-{{ svc }}" style="width:{{ cnt }}0%"></div>
+            </div>
+            <div class="bar-count">{{ cnt }}</div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div>
+    <div class="card">
+      <div class="card-header"><h3>Period Statistics</h3></div>
+      <div class="card-body">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          {% for label, val in stat_items %}
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+            <span style="font-size:.85rem;font-weight:500;color:#374151">{{ label }}</span>
+            <span style="font-size:1.25rem;font-weight:800;color:#0f172a">{{ val }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="card-body" style="text-align:center">
+        <p style="font-size:.8rem;color:#64748b;margin-bottom:12px">Generate a fresh report for the same period type:</p>
+        <form method="POST" action="{% url 'panel:generate_report' report.report_type %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary btn-block">Regenerate {{ report.report_type|title }} Report</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

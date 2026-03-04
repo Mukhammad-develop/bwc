@@ -103,7 +103,9 @@ def init_db(db_path: str) -> None:
         except sqlite3.OperationalError:
             pass
         try:
-            conn.execute("ALTER TABLE cases ADD COLUMN conversation_history TEXT DEFAULT '[]'")
+            conn.execute(
+                "ALTER TABLE cases ADD COLUMN conversation_history TEXT DEFAULT '[]'"
+            )
             conn.commit()
         except sqlite3.OperationalError:
             pass
@@ -118,7 +120,8 @@ def init_db(db_path: str) -> None:
         except sqlite3.OperationalError:
             pass
         # import_requests table (older DBs)
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS import_requests (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_tg_id    TEXT    NOT NULL,
@@ -129,10 +132,12 @@ def init_db(db_path: str) -> None:
                 created_at    TEXT    NOT NULL,
                 completed_at  TEXT
             )
-        """)
+        """
+        )
         conn.commit()
         # Create pending_sends if missing (older DBs)
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS pending_sends (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_tg_id  TEXT    NOT NULL,
@@ -142,15 +147,20 @@ def init_db(db_path: str) -> None:
                 created_at  TEXT    NOT NULL,
                 sent_at     TEXT
             )
-        """)
+        """
+        )
         conn.commit()
         try:
-            conn.execute("ALTER TABLE users ADD COLUMN linked_account INTEGER DEFAULT 0")
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN linked_account INTEGER DEFAULT 0"
+            )
             conn.commit()
         except sqlite3.OperationalError:
             pass
         try:
-            conn.execute("ALTER TABLE pending_sends ADD COLUMN account_index INTEGER DEFAULT 0")
+            conn.execute(
+                "ALTER TABLE pending_sends ADD COLUMN account_index INTEGER DEFAULT 0"
+            )
             conn.commit()
         except sqlite3.OperationalError:
             pass
@@ -166,7 +176,9 @@ def get_or_create_user(conn: sqlite3.Connection, tg_id: int) -> int:
         (tg_id, _now_iso()),
     )
     conn.commit()
-    return conn.execute("SELECT id FROM users WHERE tg_id = ?", (tg_id,)).fetchone()["id"]
+    return conn.execute("SELECT id FROM users WHERE tg_id = ?", (tg_id,)).fetchone()[
+        "id"
+    ]
 
 
 def set_language(conn: sqlite3.Connection, tg_id: int, language: str) -> None:
@@ -175,12 +187,16 @@ def set_language(conn: sqlite3.Connection, tg_id: int, language: str) -> None:
 
 
 def get_language(conn: sqlite3.Connection, tg_id: int) -> str:
-    row = conn.execute("SELECT language FROM users WHERE tg_id = ?", (tg_id,)).fetchone()
+    row = conn.execute(
+        "SELECT language FROM users WHERE tg_id = ?", (tg_id,)
+    ).fetchone()
     return row["language"] if row else "en"
 
 
 def get_chat_mode(conn: sqlite3.Connection, tg_id: int) -> str:
-    row = conn.execute("SELECT chat_mode FROM users WHERE tg_id = ?", (tg_id,)).fetchone()
+    row = conn.execute(
+        "SELECT chat_mode FROM users WHERE tg_id = ?", (tg_id,)
+    ).fetchone()
     return (row["chat_mode"] or "menu") if row else "menu"
 
 
@@ -189,9 +205,13 @@ def set_chat_mode(conn: sqlite3.Connection, tg_id: int, mode: str) -> None:
     conn.commit()
 
 
-def set_user_linked_account(conn: sqlite3.Connection, tg_id: int, account_index: int) -> None:
+def set_user_linked_account(
+    conn: sqlite3.Connection, tg_id: int, account_index: int
+) -> None:
     """Record which Telegram account (0 or 1) this user last chatted with."""
-    conn.execute("UPDATE users SET linked_account = ? WHERE tg_id = ?", (account_index, tg_id))
+    conn.execute(
+        "UPDATE users SET linked_account = ? WHERE tg_id = ?", (account_index, tg_id)
+    )
     conn.commit()
 
 
@@ -223,19 +243,43 @@ def update_case(conn: sqlite3.Connection, case_id: int, **kwargs: Any) -> None:
     conn.commit()
 
 
-def add_document(conn: sqlite3.Connection, case_id: int, doc_type: str, file_id: str, file_unique_id: str, filename: str = None, media_type: str = "document") -> None:
+def add_document(
+    conn: sqlite3.Connection,
+    case_id: int,
+    doc_type: str,
+    file_id: str,
+    file_unique_id: str,
+    filename: str = None,
+    media_type: str = "document",
+) -> None:
     conn.execute(
         "INSERT INTO documents (case_id, doc_type, filename, media_type, file_id, file_unique_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (case_id, doc_type, filename or doc_type, media_type, file_id, file_unique_id, _now_iso()),
+        (
+            case_id,
+            doc_type,
+            filename or doc_type,
+            media_type,
+            file_id,
+            file_unique_id,
+            _now_iso(),
+        ),
     )
     conn.commit()
 
 
 def list_documents(conn: sqlite3.Connection, case_id: int) -> List[sqlite3.Row]:
-    return conn.execute("SELECT * FROM documents WHERE case_id = ?", (case_id,)).fetchall()
+    return conn.execute(
+        "SELECT * FROM documents WHERE case_id = ?", (case_id,)
+    ).fetchall()
 
 
-def add_payment(conn: sqlite3.Connection, case_id: int, method: str, status: str, proof_file_id: Optional[str] = None) -> None:
+def add_payment(
+    conn: sqlite3.Connection,
+    case_id: int,
+    method: str,
+    status: str,
+    proof_file_id: Optional[str] = None,
+) -> None:
     conn.execute(
         "INSERT INTO payments (case_id, method, proof_file_id, status, created_at) VALUES (?, ?, ?, ?, ?)",
         (case_id, method, proof_file_id, status, _now_iso()),
@@ -243,7 +287,9 @@ def add_payment(conn: sqlite3.Connection, case_id: int, method: str, status: str
     conn.commit()
 
 
-def add_reminder(conn: sqlite3.Connection, case_id: int, reminder_type: str, due_at: str) -> None:
+def add_reminder(
+    conn: sqlite3.Connection, case_id: int, reminder_type: str, due_at: str
+) -> None:
     conn.execute(
         "INSERT INTO reminders (case_id, type, due_at, created_at) VALUES (?, ?, ?, ?)",
         (case_id, reminder_type, due_at, _now_iso()),
@@ -263,7 +309,9 @@ def mark_reminder_sent(conn: sqlite3.Connection, reminder_id: int) -> None:
 
 
 def get_missing_docs(conn: sqlite3.Connection, case_id: int) -> List[str]:
-    row = conn.execute("SELECT missing_docs FROM cases WHERE id = ?", (case_id,)).fetchone()
+    row = conn.execute(
+        "SELECT missing_docs FROM cases WHERE id = ?", (case_id,)
+    ).fetchone()
     if not row:
         return []
     try:
@@ -287,7 +335,9 @@ def queue_admin_send(
     conn.commit()
 
 
-def get_pending_sends(conn: sqlite3.Connection, account_index: Optional[int] = None) -> List[sqlite3.Row]:
+def get_pending_sends(
+    conn: sqlite3.Connection, account_index: Optional[int] = None
+) -> List[sqlite3.Row]:
     """Return unsent queued messages, optionally for one account only."""
     if account_index is not None:
         return conn.execute(
@@ -323,8 +373,13 @@ def get_pending_imports(conn: sqlite3.Connection) -> List[sqlite3.Row]:
     ).fetchall()
 
 
-def update_import_status(conn: sqlite3.Connection, req_id: int, status: str,
-                          message_count: int = 0, error_msg: str = "") -> None:
+def update_import_status(
+    conn: sqlite3.Connection,
+    req_id: int,
+    status: str,
+    message_count: int = 0,
+    error_msg: str = "",
+) -> None:
     conn.execute(
         """UPDATE import_requests
            SET status=?, message_count=?, error_msg=?,
@@ -336,17 +391,19 @@ def update_import_status(conn: sqlite3.Connection, req_id: int, status: str,
 
 
 def list_imports(conn: sqlite3.Connection) -> List[sqlite3.Row]:
-    return conn.execute(
-        "SELECT * FROM import_requests ORDER BY id DESC"
-    ).fetchall()
+    return conn.execute("SELECT * FROM import_requests ORDER BY id DESC").fetchall()
 
 
-def set_missing_docs(conn: sqlite3.Connection, case_id: int, missing: List[str]) -> None:
+def set_missing_docs(
+    conn: sqlite3.Connection, case_id: int, missing: List[str]
+) -> None:
     update_case(conn, case_id, missing_docs=json.dumps(missing))
 
 
 def get_conversation(conn: sqlite3.Connection, case_id: int) -> List[Dict[str, str]]:
-    row = conn.execute("SELECT conversation_history FROM cases WHERE id = ?", (case_id,)).fetchone()
+    row = conn.execute(
+        "SELECT conversation_history FROM cases WHERE id = ?", (case_id,)
+    ).fetchone()
     if not row:
         return []
     try:
@@ -355,7 +412,9 @@ def get_conversation(conn: sqlite3.Connection, case_id: int) -> List[Dict[str, s
         return []
 
 
-def add_conversation_message(conn: sqlite3.Connection, case_id: int, role: str, content: str) -> None:
+def add_conversation_message(
+    conn: sqlite3.Connection, case_id: int, role: str, content: str
+) -> None:
     conversation = get_conversation(conn, case_id)
     conversation.append({"role": role, "content": content, "timestamp": _now_iso()})
     update_case(conn, case_id, conversation_history=json.dumps(conversation))

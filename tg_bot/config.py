@@ -9,11 +9,15 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 BOT_TOKEN = os.getenv("BOT_TOKEN", "").strip()
 
 if not BOT_TOKEN:
-    raise RuntimeError("BOT_TOKEN is not set. Create a .env file with BOT_TOKEN=... or export it.")
+    raise RuntimeError(
+        "BOT_TOKEN is not set. Create a .env file with BOT_TOKEN=... or export it."
+    )
 
 # Always resolve relative to this file so the DB location never depends on cwd
 _raw = os.getenv("DB_PATH", "bot.db")
-DB_PATH = _raw if _raw.startswith("/") else str(Path(__file__).resolve().parent / "bot.db")
+DB_PATH = (
+    _raw if _raw.startswith("/") else str(Path(__file__).resolve().parent / "bot.db")
+)
 ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID", "").strip()
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "").strip()
 

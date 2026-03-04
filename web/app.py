@@ -9,8 +9,18 @@ from datetime import datetime, timedelta
 from functools import wraps
 from pathlib import Path
 
-from flask import (Flask, render_template, request, redirect, url_for,
-                   session, flash, jsonify, Response, send_file)
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    url_for,
+    session,
+    flash,
+    jsonify,
+    Response,
+    send_file,
+)
 from werkzeug.security import check_password_hash, generate_password_hash
 from dotenv import load_dotenv
 
@@ -20,8 +30,8 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key-change-in-production")
 
-BOT_TOKEN       = os.getenv("BOT_TOKEN", "")
-OPENAI_API_KEY  = os.getenv("OPENAI_API_KEY", "")
+BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 MASTER_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
 MASTER_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 
@@ -32,6 +42,7 @@ if not DB_PATH.startswith("/"):
 
 # ─────────────────────────── DB HELPERS ───────────────────────────
 
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -40,7 +51,8 @@ def get_db():
 
 def init_admin_tables():
     with get_db() as conn:
-        conn.executescript("""
+        conn.executescript(
+            """
         CREATE TABLE IF NOT EXISTS admin_users (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             username     TEXT UNIQUE NOT NULL,
@@ -103,25 +115,32 @@ def init_admin_tables():
             created_at  TEXT    NOT NULL,
             sent_at     TEXT
         );
-        """)
+        """
+        )
         conn.commit()
         for col, defval in [
             ("conversation_history", "'[]'"),
             ("context", "'{}'"),
         ]:
             try:
-                conn.execute(f"ALTER TABLE cases ADD COLUMN {col} TEXT DEFAULT {defval}")
+                conn.execute(
+                    f"ALTER TABLE cases ADD COLUMN {col} TEXT DEFAULT {defval}"
+                )
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
         for col, defval in [("filename", "NULL"), ("media_type", "'document'")]:
             try:
-                conn.execute(f"ALTER TABLE documents ADD COLUMN {col} TEXT DEFAULT {defval}")
+                conn.execute(
+                    f"ALTER TABLE documents ADD COLUMN {col} TEXT DEFAULT {defval}"
+                )
                 conn.commit()
             except sqlite3.OperationalError:
                 pass
         try:
-            conn.execute("UPDATE documents SET filename = doc_type WHERE filename IS NULL")
+            conn.execute(
+                "UPDATE documents SET filename = doc_type WHERE filename IS NULL"
+            )
             conn.commit()
         except Exception:
             pass
@@ -131,12 +150,16 @@ def init_admin_tables():
         except sqlite3.OperationalError:
             pass
         try:
-            conn.execute("ALTER TABLE users ADD COLUMN linked_account INTEGER DEFAULT 0")
+            conn.execute(
+                "ALTER TABLE users ADD COLUMN linked_account INTEGER DEFAULT 0"
+            )
             conn.commit()
         except sqlite3.OperationalError:
             pass
         try:
-            conn.execute("ALTER TABLE pending_sends ADD COLUMN account_index INTEGER DEFAULT 0")
+            conn.execute(
+                "ALTER TABLE pending_sends ADD COLUMN account_index INTEGER DEFAULT 0"
+            )
             conn.commit()
         except sqlite3.OperationalError:
             pass
@@ -149,8 +172,8 @@ def seed_master_admin():
     """Create a DB-backed master admin account on first run if it doesn't exist."""
     username = os.getenv("MASTER2_USERNAME", "bwmaster")
     password = os.getenv("MASTER2_PASSWORD", "Brightway2025!")
-    display  = os.getenv("MASTER2_DISPLAY",  "Brightway Master")
-    now      = datetime.utcnow().isoformat()
+    display = os.getenv("MASTER2_DISPLAY", "Brightway Master")
+    now = datetime.utcnow().isoformat()
     try:
         with get_db() as conn:
             existing = conn.execute(
@@ -159,7 +182,13 @@ def seed_master_admin():
             if not existing:
                 conn.execute(
                     "INSERT INTO admin_users (username, password_hash, display_name, role, created_at) VALUES (?,?,?,?,?)",
-                    (username, generate_password_hash(password), display, "master", now)
+                    (
+                        username,
+                        generate_password_hash(password),
+                        display,
+                        "master",
+                        now,
+                    ),
                 )
                 conn.commit()
     except Exception:
@@ -170,6 +199,7 @@ seed_master_admin()
 
 
 # ─────────────────────────── NOTIFICATIONS ────────────────────────
+
 
 def notify_masters(title, message, link=None, exclude_id=None):
     """Send a notification to every DB master admin (except the actor themselves)."""
@@ -183,7 +213,7 @@ def notify_masters(title, message, link=None, exclude_id=None):
                 continue
             conn.execute(
                 "INSERT INTO notifications (recipient_id, title, message, link, created_at) VALUES (?,?,?,?,?)",
-                (m["id"], title, message, link, now)
+                (m["id"], title, message, link, now),
             )
         conn.commit()
 
@@ -194,7 +224,7 @@ def notify_user(recipient_id, title, message, link=None):
     with get_db() as conn:
         conn.execute(
             "INSERT INTO notifications (recipient_id, title, message, link, created_at) VALUES (?,?,?,?,?)",
-            (recipient_id, title, message, link, now)
+            (recipient_id, title, message, link, now),
         )
         conn.commit()
 
@@ -207,7 +237,7 @@ def get_unread_count():
     with get_db() as conn:
         row = conn.execute(
             "SELECT COUNT(*) FROM notifications WHERE recipient_id=? AND is_read=0",
-            (admin_id,)
+            (admin_id,),
         ).fetchone()
         return row[0] if row else 0
 
@@ -235,21 +265,36 @@ def parse_file_tag(content):
     Also handles legacy [Uploaded document: filename] format.
     """
     import re
+
     if content.startswith("[FILE:"):
         # New format: [FILE:unique_id:filename:media_type]
         inner = content[6:].rstrip("]")
         parts = inner.split(":", 2)
         if len(parts) == 3:
-            return {"is_file": True, "unique_id": parts[0], "filename": parts[1], "media_type": parts[2]}
-    m = re.match(r'^\[Uploaded document: (.+)\]$', content.strip())
+            return {
+                "is_file": True,
+                "unique_id": parts[0],
+                "filename": parts[1],
+                "media_type": parts[2],
+            }
+    m = re.match(r"^\[Uploaded document: (.+)\]$", content.strip())
     if m:
         fname = m.group(1)
-        return {"is_file": True, "unique_id": None, "filename": fname,
-                "media_type": "photo" if fname.lower().endswith(('.jpg','.jpeg','.png','.gif','.webp')) else "document"}
+        return {
+            "is_file": True,
+            "unique_id": None,
+            "filename": fname,
+            "media_type": (
+                "photo"
+                if fname.lower().endswith((".jpg", ".jpeg", ".png", ".gif", ".webp"))
+                else "document"
+            ),
+        }
     return {"is_file": False}
 
 
 # ─────────────────────────── AUTH ─────────────────────────────────
+
 
 def check_admin_login(username, password):
     """Returns (ok, role, admin_id, display_name)."""
@@ -271,11 +316,13 @@ def login_required(f):
             flash("Please log in.", "warning")
             return redirect(url_for("admin_login"))
         return f(*a, **kw)
+
     return inner
 
 
 def master_required(f):
     """Only the hardcoded .env master or DB master-role users."""
+
     @wraps(f)
     def inner(*a, **kw):
         if not session.get("admin_logged_in"):
@@ -284,11 +331,13 @@ def master_required(f):
             flash("Master admin access required.", "error")
             return redirect(url_for("admin_dashboard"))
         return f(*a, **kw)
+
     return inner
 
 
 def elevated_required(f):
     """Master or Admin role — can see all users/cases/reports but NOT manage admins."""
+
     @wraps(f)
     def inner(*a, **kw):
         if not session.get("admin_logged_in"):
@@ -297,6 +346,7 @@ def elevated_required(f):
             flash("Admin access required.", "error")
             return redirect(url_for("admin_dashboard"))
         return f(*a, **kw)
+
     return inner
 
 
@@ -309,10 +359,12 @@ def can_view_user(user_db_id):
     if not admin_id:
         return False
     with get_db() as conn:
-        return bool(conn.execute(
-            "SELECT 1 FROM admin_assignments WHERE admin_id=? AND user_id=?",
-            (admin_id, user_db_id)
-        ).fetchone())
+        return bool(
+            conn.execute(
+                "SELECT 1 FROM admin_assignments WHERE admin_id=? AND user_id=?",
+                (admin_id, user_db_id),
+            ).fetchone()
+        )
 
 
 def is_elevated():
@@ -321,17 +373,19 @@ def is_elevated():
 
 # ─────────────────────────── AI HELPERS ───────────────────────────
 
+
 def call_ai(system_prompt, user_content, max_tokens=800):
     if not OPENAI_API_KEY:
         return None
     try:
         from openai import OpenAI
+
         client = OpenAI(api_key=OPENAI_API_KEY)
         resp = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user",   "content": user_content},
+                {"role": "user", "content": user_content},
             ],
             max_tokens=max_tokens,
             temperature=0.3,
@@ -394,12 +448,12 @@ def save_user_profile(user_db_id, data):
         if exists:
             conn.execute(
                 "UPDATE user_ai_profiles SET extracted_data=?, updated_at=? WHERE user_id=?",
-                (json.dumps(data), now, user_db_id)
+                (json.dumps(data), now, user_db_id),
             )
         else:
             conn.execute(
                 "INSERT INTO user_ai_profiles (user_id, extracted_data, updated_at) VALUES (?,?,?)",
-                (user_db_id, json.dumps(data), now)
+                (user_db_id, json.dumps(data), now),
             )
         conn.commit()
 
@@ -419,7 +473,8 @@ def get_tg_file_url(file_id):
     try:
         r = requests.get(
             f"https://api.telegram.org/bot{BOT_TOKEN}/getFile",
-            params={"file_id": file_id}, timeout=10
+            params={"file_id": file_id},
+            timeout=10,
         )
         data = r.json()
         if data.get("ok"):
@@ -479,7 +534,19 @@ def _convert_audio_to_wav(data: bytes, input_ext: str):
         out_path = in_path + ".wav"
         try:
             subprocess.run(
-                ["ffmpeg", "-y", "-i", in_path, "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", out_path],
+                [
+                    "ffmpeg",
+                    "-y",
+                    "-i",
+                    in_path,
+                    "-acodec",
+                    "pcm_s16le",
+                    "-ar",
+                    "16000",
+                    "-ac",
+                    "1",
+                    out_path,
+                ],
                 check=True,
                 capture_output=True,
                 timeout=60,
@@ -501,7 +568,7 @@ def _convert_audio_to_wav(data: bytes, input_ext: str):
 @login_required
 def admin_local_file(filename):
     """Serve a file that was downloaded by the userbot."""
-    safe = UPLOADS_DIR / Path(filename).name   # prevent directory traversal
+    safe = UPLOADS_DIR / Path(filename).name  # prevent directory traversal
     if not safe.exists():
         return "File not found", 404
     mt = _mimetype_for(filename)
@@ -510,26 +577,51 @@ def admin_local_file(filename):
 
 # ─────────────────────────── STATS & REPORTS ──────────────────────
 
+
 def compute_stats(start_iso, end_iso):
     with get_db() as conn:
+
         def q(sql, *p):
             return conn.execute(sql, p).fetchone()[0]
 
-        new_users     = q("SELECT COUNT(*) FROM users WHERE created_at BETWEEN ? AND ?", start_iso, end_iso)
-        new_cases     = q("SELECT COUNT(*) FROM cases WHERE created_at BETWEEN ? AND ?", start_iso, end_iso)
-        paid          = q("SELECT COUNT(*) FROM cases WHERE payment_status='received' AND updated_at BETWEEN ? AND ?", start_iso, end_iso)
-        completed     = q("SELECT COUNT(*) FROM cases WHERE status='completed' AND updated_at BETWEEN ? AND ?", start_iso, end_iso)
-        active        = q("SELECT COUNT(*) FROM cases WHERE status='active'")
-        docs          = q("""SELECT COUNT(*) FROM documents d
+        new_users = q(
+            "SELECT COUNT(*) FROM users WHERE created_at BETWEEN ? AND ?",
+            start_iso,
+            end_iso,
+        )
+        new_cases = q(
+            "SELECT COUNT(*) FROM cases WHERE created_at BETWEEN ? AND ?",
+            start_iso,
+            end_iso,
+        )
+        paid = q(
+            "SELECT COUNT(*) FROM cases WHERE payment_status='received' AND updated_at BETWEEN ? AND ?",
+            start_iso,
+            end_iso,
+        )
+        completed = q(
+            "SELECT COUNT(*) FROM cases WHERE status='completed' AND updated_at BETWEEN ? AND ?",
+            start_iso,
+            end_iso,
+        )
+        active = q("SELECT COUNT(*) FROM cases WHERE status='active'")
+        docs = q(
+            """SELECT COUNT(*) FROM documents d
                               JOIN cases c ON d.case_id=c.id
-                              WHERE d.created_at BETWEEN ? AND ?""", start_iso, end_iso)
-        by_service    = conn.execute(
+                              WHERE d.created_at BETWEEN ? AND ?""",
+            start_iso,
+            end_iso,
+        )
+        by_service = conn.execute(
             "SELECT service, COUNT(*) cnt FROM cases WHERE created_at BETWEEN ? AND ? GROUP BY service",
-            (start_iso, end_iso)
+            (start_iso, end_iso),
         ).fetchall()
     return {
-        "new_users": new_users, "new_cases": new_cases,
-        "paid": paid, "completed": completed, "active": active,
+        "new_users": new_users,
+        "new_cases": new_cases,
+        "paid": paid,
+        "completed": completed,
+        "active": active,
         "docs": docs,
         "by_service": {r["service"]: r["cnt"] for r in by_service},
     }
@@ -537,14 +629,22 @@ def compute_stats(start_iso, end_iso):
 
 def generate_report(report_type):
     now = datetime.utcnow()
-    delta = {"daily": timedelta(days=1), "weekly": timedelta(weeks=1),
-             "monthly": timedelta(days=30), "quarterly": timedelta(days=90)}
-    label = {"daily": "last 24 hours", "weekly": "last 7 days",
-             "monthly": "last 30 days", "quarterly": "last 90 days"}
+    delta = {
+        "daily": timedelta(days=1),
+        "weekly": timedelta(weeks=1),
+        "monthly": timedelta(days=30),
+        "quarterly": timedelta(days=90),
+    }
+    label = {
+        "daily": "last 24 hours",
+        "weekly": "last 7 days",
+        "monthly": "last 30 days",
+        "quarterly": "last 90 days",
+    }
     if report_type not in delta:
         return None
     start = (now - delta[report_type]).isoformat()
-    end   = now.isoformat()
+    end = now.isoformat()
     stats = compute_stats(start, end)
 
     conclusion = None
@@ -565,21 +665,30 @@ Documents uploaded: {stats['docs']}"""
     with get_db() as conn:
         conn.execute(
             "INSERT INTO ai_reports (report_type,period_start,period_end,stats,ai_conclusion,created_at) VALUES (?,?,?,?,?,?)",
-            (report_type, start, end, json.dumps(stats), conclusion, now.isoformat())
+            (report_type, start, end, json.dumps(stats), conclusion, now.isoformat()),
         )
         conn.commit()
-    return {"stats": stats, "conclusion": conclusion, "period": label[report_type], "start": start, "end": end}
+    return {
+        "stats": stats,
+        "conclusion": conclusion,
+        "period": label[report_type],
+        "start": start,
+        "end": end,
+    }
 
 
 # ─────────────────────────── PUBLIC ROUTES ────────────────────────
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
 @app.route("/services")
 def services():
     return render_template("services.html")
+
 
 @app.route("/contact")
 def contact():
@@ -588,21 +697,25 @@ def contact():
 
 # ─────────────────────────── ADMIN AUTH ───────────────────────────
 
+
 @app.route("/admin/notifications")
 @login_required
 def admin_notifications():
     admin_id = session.get("admin_id")
     if not admin_id:
-        flash("Notifications are not available for the built-in master account.", "warning")
+        flash(
+            "Notifications are not available for the built-in master account.",
+            "warning",
+        )
         return redirect(url_for("admin_dashboard"))
     with get_db() as conn:
         notifications = conn.execute(
             "SELECT * FROM notifications WHERE recipient_id=? ORDER BY created_at DESC LIMIT 50",
-            (admin_id,)
+            (admin_id,),
         ).fetchall()
         conn.execute(
             "UPDATE notifications SET is_read=1 WHERE recipient_id=? AND is_read=0",
-            (admin_id,)
+            (admin_id,),
         )
         conn.commit()
     return render_template("admin/notifications.html", notifications=notifications)
@@ -616,7 +729,7 @@ def admin_notif_read(notif_id):
         with get_db() as conn:
             conn.execute(
                 "UPDATE notifications SET is_read=1 WHERE id=? AND recipient_id=?",
-                (notif_id, admin_id)
+                (notif_id, admin_id),
             )
             conn.commit()
     return jsonify({"ok": True})
@@ -629,8 +742,7 @@ def admin_notif_read_all():
     if admin_id:
         with get_db() as conn:
             conn.execute(
-                "UPDATE notifications SET is_read=1 WHERE recipient_id=?",
-                (admin_id,)
+                "UPDATE notifications SET is_read=1 WHERE recipient_id=?", (admin_id,)
             )
             conn.commit()
     return redirect(url_for("admin_notifications"))
@@ -646,7 +758,7 @@ def admin_notif_preview():
     with get_db() as conn:
         rows = conn.execute(
             "SELECT * FROM notifications WHERE recipient_id=? ORDER BY created_at DESC LIMIT 5",
-            (admin_id,)
+            (admin_id,),
         ).fetchall()
     return jsonify({"items": [dict(r) for r in rows]})
 
@@ -660,7 +772,7 @@ def admin_notif_mark_preview_read():
         with get_db() as conn:
             conn.execute(
                 "UPDATE notifications SET is_read=1 WHERE recipient_id=? AND is_read=0",
-                (admin_id,)
+                (admin_id,),
             )
             conn.commit()
     return jsonify({"ok": True})
@@ -673,14 +785,14 @@ def admin_login():
     if request.method == "POST":
         ok, role, aid, display = check_admin_login(
             request.form.get("username", "").strip(),
-            request.form.get("password", "").strip()
+            request.form.get("password", "").strip(),
         )
         if ok:
             session["admin_logged_in"] = True
-            session["admin_username"]  = request.form.get("username")
-            session["admin_role"]      = role
-            session["admin_id"]        = aid
-            session["admin_display"]   = display
+            session["admin_username"] = request.form.get("username")
+            session["admin_role"] = role
+            session["admin_id"] = aid
+            session["admin_display"] = display
             flash(f"Welcome back, {display}!", "success")
             return redirect(url_for("admin_dashboard"))
         flash("Invalid credentials.", "error")
@@ -695,10 +807,13 @@ def admin_logout():
 
 # ─────────────────────────── PROFILE ──────────────────────────────
 
+
 @app.route("/admin/profile", methods=["GET", "POST"])
 @login_required
 def admin_profile():
-    is_env_master = (session.get("admin_role") == "master" and session.get("admin_id") is None)
+    is_env_master = (
+        session.get("admin_role") == "master" and session.get("admin_id") is None
+    )
 
     if request.method == "POST":
         action = request.form.get("action")
@@ -715,7 +830,7 @@ def admin_profile():
                 with get_db() as conn:
                     conn.execute(
                         "UPDATE admin_users SET display_name=? WHERE id=?",
-                        (new_name, session["admin_id"])
+                        (new_name, session["admin_id"]),
                     )
                     conn.commit()
                 session["admin_display"] = new_name
@@ -723,7 +838,10 @@ def admin_profile():
 
         elif action == "username":
             if is_env_master:
-                flash("The built-in admin username is set via the .env file (ADMIN_USERNAME).", "warning")
+                flash(
+                    "The built-in admin username is set via the .env file (ADMIN_USERNAME).",
+                    "warning",
+                )
             else:
                 new_username = request.form.get("new_username", "").strip()
                 if not new_username:
@@ -735,13 +853,13 @@ def admin_profile():
                 else:
                     try:
                         old_username = session.get("admin_username")
-                        actor_role   = session.get("admin_role")
+                        actor_role = session.get("admin_role")
                         actor_display = session.get("admin_display") or old_username
-                        actor_id     = session.get("admin_id")
+                        actor_id = session.get("admin_id")
                         with get_db() as conn:
                             conn.execute(
                                 "UPDATE admin_users SET username=? WHERE id=?",
-                                (new_username, actor_id)
+                                (new_username, actor_id),
                             )
                             conn.commit()
                         session["admin_username"] = new_username
@@ -751,18 +869,21 @@ def admin_profile():
                             title="Username changed",
                             message=f"{actor_display} (@{old_username}) changed their username to @{new_username}.",
                             link=url_for("admin_notifications"),
-                            exclude_id=actor_id if actor_role != "master" else None
+                            exclude_id=actor_id if actor_role != "master" else None,
                         )
                     except sqlite3.IntegrityError:
                         flash("That username is already taken.", "error")
 
         elif action == "password":
             if is_env_master:
-                flash("Your password is set via the .env file on the server. Update ADMIN_PASSWORD there.", "warning")
+                flash(
+                    "Your password is set via the .env file on the server. Update ADMIN_PASSWORD there.",
+                    "warning",
+                )
             else:
-                current  = request.form.get("current_password", "")
-                new_pw   = request.form.get("new_password", "")
-                confirm  = request.form.get("confirm_password", "")
+                current = request.form.get("current_password", "")
+                new_pw = request.form.get("new_password", "")
+                confirm = request.form.get("confirm_password", "")
                 if not current or not new_pw or not confirm:
                     flash("All password fields are required.", "error")
                 elif new_pw != confirm:
@@ -773,14 +894,16 @@ def admin_profile():
                     with get_db() as conn:
                         row = conn.execute(
                             "SELECT password_hash FROM admin_users WHERE id=?",
-                            (session["admin_id"],)
+                            (session["admin_id"],),
                         ).fetchone()
-                        if not row or not check_password_hash(row["password_hash"], current):
+                        if not row or not check_password_hash(
+                            row["password_hash"], current
+                        ):
                             flash("Current password is incorrect.", "error")
                         else:
                             conn.execute(
                                 "UPDATE admin_users SET password_hash=? WHERE id=?",
-                                (generate_password_hash(new_pw), session["admin_id"])
+                                (generate_password_hash(new_pw), session["admin_id"]),
                             )
                             conn.commit()
                             flash("Password changed successfully.", "success")
@@ -789,9 +912,10 @@ def admin_profile():
 
     # GET — load current data
     profile_data = {
-        "username":     session.get("admin_username", "admin"),
-        "display_name": session.get("admin_display") or session.get("admin_username", "admin"),
-        "role":         session.get("admin_role", "consultant"),
+        "username": session.get("admin_username", "admin"),
+        "display_name": session.get("admin_display")
+        or session.get("admin_username", "admin"),
+        "role": session.get("admin_role", "consultant"),
     }
     if not is_env_master and session.get("admin_id"):
         with get_db() as conn:
@@ -799,30 +923,40 @@ def admin_profile():
                 "SELECT * FROM admin_users WHERE id=?", (session["admin_id"],)
             ).fetchone()
             if row:
-                profile_data["username"]     = row["username"]
+                profile_data["username"] = row["username"]
                 profile_data["display_name"] = row["display_name"] or row["username"]
-                profile_data["created_at"]   = row["created_at"][:10] if row["created_at"] else "—"
+                profile_data["created_at"] = (
+                    row["created_at"][:10] if row["created_at"] else "—"
+                )
 
-    return render_template("admin/profile.html",
+    return render_template(
+        "admin/profile.html",
         profile=profile_data,
         is_env_master=is_env_master,
-        is_master=session.get("admin_role") == "master"
+        is_master=session.get("admin_role") == "master",
     )
 
 
 # ─────────────────────────── DASHBOARD ────────────────────────────
 
+
 @app.route("/admin")
 @login_required
 def admin_dashboard():
     is_master = session.get("admin_role") == "master"
-    elevated  = is_elevated()
+    elevated = is_elevated()
     with get_db() as conn:
-        total_users  = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-        total_cases  = conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
-        active_cases = conn.execute("SELECT COUNT(*) FROM cases WHERE status='active'").fetchone()[0]
-        paid_cases   = conn.execute("SELECT COUNT(*) FROM cases WHERE payment_status='received'").fetchone()[0]
-        by_service   = conn.execute("SELECT service, COUNT(*) cnt FROM cases GROUP BY service").fetchall()
+        total_users = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+        total_cases = conn.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
+        active_cases = conn.execute(
+            "SELECT COUNT(*) FROM cases WHERE status='active'"
+        ).fetchone()[0]
+        paid_cases = conn.execute(
+            "SELECT COUNT(*) FROM cases WHERE payment_status='received'"
+        ).fetchone()[0]
+        by_service = conn.execute(
+            "SELECT service, COUNT(*) cnt FROM cases GROUP BY service"
+        ).fetchall()
 
         recent_query = """
             SELECT c.id, c.service, c.status, c.payment_status, c.created_at, u.tg_id, u.id as user_db_id
@@ -840,7 +974,7 @@ def admin_dashboard():
         else:
             my_users_count = conn.execute(
                 "SELECT COUNT(*) FROM admin_assignments WHERE admin_id=?",
-                (session.get("admin_id"),)
+                (session.get("admin_id"),),
             ).fetchone()[0]
 
         # Latest report
@@ -848,23 +982,31 @@ def admin_dashboard():
             "SELECT * FROM ai_reports ORDER BY created_at DESC LIMIT 1"
         ).fetchone()
 
-    return render_template("admin/dashboard.html",
-        total_users=total_users, total_cases=total_cases,
-        active_cases=active_cases, paid_cases=paid_cases,
-        by_service=by_service, recent_cases=recent_cases,
-        my_users_count=my_users_count, latest_report=latest_report,
-        is_master=is_master, is_elevated=elevated)
+    return render_template(
+        "admin/dashboard.html",
+        total_users=total_users,
+        total_cases=total_cases,
+        active_cases=active_cases,
+        paid_cases=paid_cases,
+        by_service=by_service,
+        recent_cases=recent_cases,
+        my_users_count=my_users_count,
+        latest_report=latest_report,
+        is_master=is_master,
+        is_elevated=elevated,
+    )
 
 
 # ─────────────────────────── CASES ────────────────────────────────
+
 
 @app.route("/admin/cases")
 @login_required
 def admin_cases():
     is_master = session.get("admin_role") == "master"
-    elevated  = is_elevated()
+    elevated = is_elevated()
     service = request.args.get("service", "")
-    status  = request.args.get("status", "")
+    status = request.args.get("status", "")
     payment = request.args.get("payment", "")
 
     query = """
@@ -875,31 +1017,45 @@ def admin_cases():
     params = []
     if not elevated:
         admin_id = session.get("admin_id")
-        query += f" AND u.id IN (SELECT user_id FROM admin_assignments WHERE admin_id=?)"
+        query += (
+            f" AND u.id IN (SELECT user_id FROM admin_assignments WHERE admin_id=?)"
+        )
         params.append(admin_id)
     if service:
-        query += " AND c.service=?"; params.append(service)
+        query += " AND c.service=?"
+        params.append(service)
     if status:
-        query += " AND c.status=?";  params.append(status)
+        query += " AND c.status=?"
+        params.append(status)
     if payment:
-        query += " AND c.payment_status=?"; params.append(payment)
+        query += " AND c.payment_status=?"
+        params.append(payment)
     query += " ORDER BY c.created_at DESC"
 
     with get_db() as conn:
         cases = conn.execute(query, params).fetchall()
-    return render_template("admin/cases.html", cases=cases,
-        filter_service=service, filter_status=status, filter_payment=payment,
-        is_master=is_master, is_elevated=elevated)
+    return render_template(
+        "admin/cases.html",
+        cases=cases,
+        filter_service=service,
+        filter_status=status,
+        filter_payment=payment,
+        is_master=is_master,
+        is_elevated=elevated,
+    )
 
 
 @app.route("/admin/cases/<int:case_id>")
 @login_required
 def admin_case_detail(case_id):
     with get_db() as conn:
-        case = conn.execute("""
+        case = conn.execute(
+            """
             SELECT c.*, u.tg_id, u.language, u.id as user_db_id
             FROM cases c JOIN users u ON c.user_id=u.id WHERE c.id=?
-        """, (case_id,)).fetchone()
+        """,
+            (case_id,),
+        ).fetchone()
         if not case:
             flash("Case not found.", "error")
             return redirect(url_for("admin_cases"))
@@ -911,15 +1067,16 @@ def admin_case_detail(case_id):
             conversation = json.loads(case["conversation_history"] or "[]")
         except (IndexError, KeyError, TypeError):
             conversation = []
-        documents    = conn.execute(
-            "SELECT * FROM documents WHERE case_id=? ORDER BY created_at ASC", (case_id,)
+        documents = conn.execute(
+            "SELECT * FROM documents WHERE case_id=? ORDER BY created_at ASC",
+            (case_id,),
         ).fetchall()
 
         # Resolve file URLs for inline view
         docs_with_url = []
         # Also build lookup dicts for in-chat file rendering
-        docs_by_unique_id = {}   # file_unique_id -> {doc, url}
-        docs_by_filename   = {}  # filename -> {doc, url}  (fallback for old format)
+        docs_by_unique_id = {}  # file_unique_id -> {doc, url}
+        docs_by_filename = {}  # filename -> {doc, url}  (fallback for old format)
         for doc in documents:
             url = get_tg_file_url(doc["file_id"])
             entry = {"doc": doc, "url": url}
@@ -930,36 +1087,48 @@ def admin_case_detail(case_id):
                 docs_by_filename[fname] = entry
         docs_for_files = [e for e in docs_with_url if not _is_voice_doc(e["doc"])]
 
-    return render_template("admin/case_detail.html",
-        case=case, conversation=conversation,
+    return render_template(
+        "admin/case_detail.html",
+        case=case,
+        conversation=conversation,
         docs_with_url=docs_with_url,
         docs_for_files=docs_for_files,
         docs_by_unique_id=docs_by_unique_id,
         docs_by_filename=docs_by_filename,
-        is_master=session.get("admin_role")=="master")
+        is_master=session.get("admin_role") == "master",
+    )
 
 
 @app.route("/admin/cases/<int:case_id>/update", methods=["POST"])
 @login_required
 def admin_case_update(case_id):
     with get_db() as conn:
-        case = conn.execute("SELECT user_id FROM cases WHERE id=?", (case_id,)).fetchone()
+        case = conn.execute(
+            "SELECT user_id FROM cases WHERE id=?", (case_id,)
+        ).fetchone()
         if not case or not can_view_user(case["user_id"]):
             flash("Access denied.", "error")
             return redirect(url_for("admin_cases"))
         now = datetime.utcnow().isoformat()
-        status  = request.form.get("status")
+        status = request.form.get("status")
         payment = request.form.get("payment_status")
         if status:
-            conn.execute("UPDATE cases SET status=?, updated_at=? WHERE id=?", (status, now, case_id))
+            conn.execute(
+                "UPDATE cases SET status=?, updated_at=? WHERE id=?",
+                (status, now, case_id),
+            )
         if payment:
-            conn.execute("UPDATE cases SET payment_status=?, updated_at=? WHERE id=?", (payment, now, case_id))
+            conn.execute(
+                "UPDATE cases SET payment_status=?, updated_at=? WHERE id=?",
+                (payment, now, case_id),
+            )
         conn.commit()
     flash("Case updated.", "success")
     return redirect(url_for("admin_case_detail", case_id=case_id))
 
 
 # ─────────────────────────── FILES ────────────────────────────────
+
 
 @app.route("/admin/files/view/<file_id>")
 @login_required
@@ -1000,10 +1169,13 @@ def admin_file_download(file_id):
     try:
         r = requests.get(url, timeout=30)
         from io import BytesIO
-        return send_file(BytesIO(r.content),
-                         download_name=download_name,
-                         as_attachment=True,
-                         mimetype=r.headers.get("Content-Type", "application/octet-stream"))
+
+        return send_file(
+            BytesIO(r.content),
+            download_name=download_name,
+            as_attachment=True,
+            mimetype=r.headers.get("Content-Type", "application/octet-stream"),
+        )
     except Exception as e:
         return f"Error: {e}", 500
 
@@ -1065,9 +1237,14 @@ def admin_transcribe_document(doc_id):
             data, filename = converted
             ext = ".wav"
         else:
-            return jsonify({
-                "error": "Audio format not supported by Whisper (need .oga→.wav conversion). Install ffmpeg on the server."
-            }), 400
+            return (
+                jsonify(
+                    {
+                        "error": "Audio format not supported by Whisper (need .oga→.wav conversion). Install ffmpeg on the server."
+                    }
+                ),
+                400,
+            )
 
     # Whisper API (optional language hint from user's case language)
     whisper_data = {"model": "whisper-1"}
@@ -1078,7 +1255,9 @@ def admin_transcribe_document(doc_id):
             resp = s.post(
                 "https://api.openai.com/v1/audio/transcriptions",
                 headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-                files={"file": (filename, data, _mimetype_for(filename) or "audio/wav")},
+                files={
+                    "file": (filename, data, _mimetype_for(filename) or "audio/wav")
+                },
                 data=whisper_data,
                 timeout=60,
             )
@@ -1086,10 +1265,17 @@ def admin_transcribe_document(doc_id):
             try:
                 err_body = resp.json()
                 err = err_body.get("error")
-                msg = err.get("message", str(err)) if isinstance(err, dict) else (str(err) if err else resp.text or resp.reason)
+                msg = (
+                    err.get("message", str(err))
+                    if isinstance(err, dict)
+                    else (str(err) if err else resp.text or resp.reason)
+                )
             except Exception:
                 msg = resp.text or resp.reason or f"HTTP {resp.status_code}"
-            return jsonify({"error": msg or f"HTTP {resp.status_code}"}), resp.status_code
+            return (
+                jsonify({"error": msg or f"HTTP {resp.status_code}"}),
+                resp.status_code,
+            )
         result = resp.json()
         text = (result.get("text") or "").strip()
     except requests.RequestException as e:
@@ -1104,14 +1290,16 @@ def admin_transcribe_document(doc_id):
 
 # ─────────────────────────── USERS & PROFILES ─────────────────────
 
+
 @app.route("/admin/users")
 @login_required
 def admin_users():
     is_master = session.get("admin_role") == "master"
-    elevated  = is_elevated()
+    elevated = is_elevated()
     with get_db() as conn:
         if elevated:
-            users = conn.execute("""
+            users = conn.execute(
+                """
                 SELECT u.id, u.tg_id, u.language, u.created_at,
                        COUNT(DISTINCT c.id) case_count,
                        COUNT(DISTINCT d.id) doc_count,
@@ -1121,10 +1309,12 @@ def admin_users():
                 LEFT JOIN documents d ON c.id=d.case_id
                 LEFT JOIN user_ai_profiles p ON u.id=p.user_id
                 GROUP BY u.id ORDER BY u.created_at DESC
-            """).fetchall()
+            """
+            ).fetchall()
         else:
             admin_id = session.get("admin_id")
-            users = conn.execute("""
+            users = conn.execute(
+                """
                 SELECT u.id, u.tg_id, u.language, u.created_at,
                        COUNT(DISTINCT c.id) case_count,
                        COUNT(DISTINCT d.id) doc_count,
@@ -1135,8 +1325,12 @@ def admin_users():
                 LEFT JOIN documents d ON c.id=d.case_id
                 LEFT JOIN user_ai_profiles p ON u.id=p.user_id
                 GROUP BY u.id ORDER BY u.created_at DESC
-            """, (admin_id,)).fetchall()
-    return render_template("admin/users.html", users=users, is_master=is_master, is_elevated=elevated)
+            """,
+                (admin_id,),
+            ).fetchall()
+    return render_template(
+        "admin/users.html", users=users, is_master=is_master, is_elevated=elevated
+    )
 
 
 @app.route("/admin/users/<int:user_db_id>")
@@ -1147,7 +1341,7 @@ def admin_user_profile(user_db_id):
         return redirect(url_for("admin_users"))
 
     with get_db() as conn:
-        user  = conn.execute("SELECT * FROM users WHERE id=?", (user_db_id,)).fetchone()
+        user = conn.execute("SELECT * FROM users WHERE id=?", (user_db_id,)).fetchone()
         if not user:
             flash("User not found.", "error")
             return redirect(url_for("admin_users"))
@@ -1155,14 +1349,21 @@ def admin_user_profile(user_db_id):
         raw_cases = conn.execute(
             "SELECT * FROM cases WHERE user_id=? ORDER BY created_at ASC", (user_db_id,)
         ).fetchall()
+
         # Dedupe consecutive identical messages in each case's conversation (fixes double display)
         def _dedupe_conversation(conv_list):
             out = []
             for m in conv_list:
-                if out and out[-1].get("role") == m.get("role") and out[-1].get("content") == m.get("content") and out[-1].get("timestamp") == m.get("timestamp"):
+                if (
+                    out
+                    and out[-1].get("role") == m.get("role")
+                    and out[-1].get("content") == m.get("content")
+                    and out[-1].get("timestamp") == m.get("timestamp")
+                ):
                     continue
                 out.append(m)
             return out
+
         cases = []
         for c in raw_cases:
             c = dict(c)
@@ -1173,11 +1374,14 @@ def admin_user_profile(user_db_id):
             c["conversation_history"] = json.dumps(_dedupe_conversation(conv))
             cases.append(c)
 
-        all_docs = conn.execute("""
+        all_docs = conn.execute(
+            """
             SELECT d.*, c.service FROM documents d
             JOIN cases c ON d.case_id=c.id
             WHERE c.user_id=? ORDER BY d.created_at ASC
-        """, (user_db_id,)).fetchall()
+        """,
+            (user_db_id,),
+        ).fetchall()
 
         profile_row = conn.execute(
             "SELECT * FROM user_ai_profiles WHERE user_id=?", (user_db_id,)
@@ -1187,12 +1391,15 @@ def admin_user_profile(user_db_id):
             "SELECT id, username, display_name, role FROM admin_users ORDER BY role, username"
         ).fetchall()
 
-        assignments = conn.execute("""
+        assignments = conn.execute(
+            """
             SELECT a.id, a.username, a.display_name, a.role
             FROM admin_users a
             JOIN admin_assignments aa ON a.id=aa.admin_id
             WHERE aa.user_id=?
-        """, (user_db_id,)).fetchall()
+        """,
+            (user_db_id,),
+        ).fetchall()
 
     profile = {}
     if profile_row:
@@ -1203,9 +1410,9 @@ def admin_user_profile(user_db_id):
 
     docs_with_url = []
     all_docs_by_unique_id = {}
-    all_docs_by_filename  = {}
+    all_docs_by_filename = {}
     for d in all_docs:
-        url   = get_tg_file_url(d["file_id"])
+        url = get_tg_file_url(d["file_id"])
         entry = {"doc": d, "url": url}
         docs_with_url.append(entry)
         all_docs_by_unique_id[d["file_unique_id"]] = entry
@@ -1214,15 +1421,21 @@ def admin_user_profile(user_db_id):
             all_docs_by_filename[fname] = entry
     docs_for_files = [e for e in docs_with_url if not _is_voice_doc(e["doc"])]
 
-    return render_template("admin/user_profile.html",
-        user=user, cases=cases, docs_with_url=docs_with_url,
+    return render_template(
+        "admin/user_profile.html",
+        user=user,
+        cases=cases,
+        docs_with_url=docs_with_url,
         docs_for_files=docs_for_files,
-        profile=profile, profile_updated=profile_row["updated_at"] if profile_row else None,
-        is_master=session.get("admin_role")=="master",
+        profile=profile,
+        profile_updated=profile_row["updated_at"] if profile_row else None,
+        is_master=session.get("admin_role") == "master",
         is_elevated=is_elevated(),
-        all_admins=all_admins, assignments=assignments,
+        all_admins=all_admins,
+        assignments=assignments,
         all_docs_by_unique_id=all_docs_by_unique_id,
-        all_docs_by_filename=all_docs_by_filename)
+        all_docs_by_filename=all_docs_by_filename,
+    )
 
 
 @app.route("/admin/users/<int:user_db_id>/send", methods=["POST"])
@@ -1235,11 +1448,13 @@ def admin_send_message(user_db_id):
     if not text:
         return jsonify({"error": "Empty message"}), 400
 
-    ts         = datetime.utcnow().isoformat()
+    ts = datetime.utcnow().isoformat()
     admin_name = session.get("admin_display") or session.get("admin_username", "Admin")
 
     with get_db() as conn:
-        user = conn.execute("SELECT tg_id, linked_account FROM users WHERE id=?", (user_db_id,)).fetchone()
+        user = conn.execute(
+            "SELECT tg_id, linked_account FROM users WHERE id=?", (user_db_id,)
+        ).fetchone()
         if not user:
             return jsonify({"error": "User not found"}), 404
         user_d = dict(user)
@@ -1255,7 +1470,8 @@ def admin_send_message(user_db_id):
 
         # Save to the most recent case's conversation history
         case = conn.execute(
-            "SELECT * FROM cases WHERE user_id=? ORDER BY id DESC LIMIT 1", (user_db_id,)
+            "SELECT * FROM cases WHERE user_id=? ORDER BY id DESC LIMIT 1",
+            (user_db_id,),
         ).fetchone()
 
         if case:
@@ -1264,15 +1480,29 @@ def admin_send_message(user_db_id):
                 conv = json.loads(case["conversation_history"] or "[]")
             except Exception:
                 pass
-            conv.append({"role": "admin", "content": text, "timestamp": ts, "sender": admin_name})
+            conv.append(
+                {
+                    "role": "admin",
+                    "content": text,
+                    "timestamp": ts,
+                    "sender": admin_name,
+                }
+            )
             conn.execute(
                 "UPDATE cases SET conversation_history=?, updated_at=? WHERE id=?",
-                (json.dumps(conv), ts, case["id"])
+                (json.dumps(conv), ts, case["id"]),
             )
 
         conn.commit()
 
-    return jsonify({"ok": True, "tg_sent": True, "timestamp": ts[:16].replace("T", " "), "sender": admin_name})
+    return jsonify(
+        {
+            "ok": True,
+            "tg_sent": True,
+            "timestamp": ts[:16].replace("T", " "),
+            "sender": admin_name,
+        }
+    )
 
 
 @app.route("/admin/users/<int:user_db_id>/poll")
@@ -1298,19 +1528,22 @@ def admin_poll_messages(user_db_id):
         for msg in conv:
             ts = msg.get("timestamp", "")
             if not since or ts > since:
-                new_msgs.append({
-                    "role":      msg.get("role", "user"),
-                    "content":   msg.get("content", ""),
-                    "timestamp": ts,
-                    "sender":    msg.get("sender", ""),
-                    "case_id":   case["id"],
-                })
+                new_msgs.append(
+                    {
+                        "role": msg.get("role", "user"),
+                        "content": msg.get("content", ""),
+                        "timestamp": ts,
+                        "sender": msg.get("sender", ""),
+                        "case_id": case["id"],
+                    }
+                )
 
     # Sort by timestamp
     new_msgs.sort(key=lambda m: m["timestamp"])
 
     # Collect file_docs for [FILE:unique_id:filename:type] so the client can render voice bubbles in live view
     import re
+
     unique_ids = set()
     for m in new_msgs:
         c = m.get("content", "") or ""
@@ -1357,14 +1590,14 @@ def admin_extract_profile(user_db_id):
 @master_required
 def admin_assign_user(user_db_id):
     admin_id = request.form.get("admin_id", type=int)
-    action   = request.form.get("action", "assign")
+    action = request.form.get("action", "assign")
     now = datetime.utcnow().isoformat()
     with get_db() as conn:
         if action == "assign":
             try:
                 conn.execute(
                     "INSERT INTO admin_assignments (admin_id, user_id, assigned_at) VALUES (?,?,?)",
-                    (admin_id, user_db_id, now)
+                    (admin_id, user_db_id, now),
                 )
                 conn.commit()
                 flash("User assigned.", "success")
@@ -1373,7 +1606,7 @@ def admin_assign_user(user_db_id):
         else:
             conn.execute(
                 "DELETE FROM admin_assignments WHERE admin_id=? AND user_id=?",
-                (admin_id, user_db_id)
+                (admin_id, user_db_id),
             )
             conn.commit()
             flash("Assignment removed.", "success")
@@ -1382,33 +1615,38 @@ def admin_assign_user(user_db_id):
 
 # ─────────────────────────── ADMIN MANAGEMENT ─────────────────────
 
+
 @app.route("/admin/admins")
 @master_required
 def admin_admins():
     with get_db() as conn:
-        admins = conn.execute("""
+        admins = conn.execute(
+            """
             SELECT a.*, COUNT(aa.user_id) as assigned_count
             FROM admin_users a
             LEFT JOIN admin_assignments aa ON a.id=aa.admin_id
             GROUP BY a.id ORDER BY a.created_at DESC
-        """).fetchall()
-        all_users = conn.execute("""
+        """
+        ).fetchall()
+        all_users = conn.execute(
+            """
             SELECT u.id, u.tg_id, u.language,
                    p.extracted_data
             FROM users u
             LEFT JOIN user_ai_profiles p ON u.id=p.user_id
             ORDER BY u.created_at DESC
-        """).fetchall()
+        """
+        ).fetchall()
     return render_template("admin/admins.html", admins=admins, all_users=all_users)
 
 
 @app.route("/admin/admins/add", methods=["POST"])
 @master_required
 def admin_add_admin():
-    username     = request.form.get("username", "").strip()
-    password     = request.form.get("password", "").strip()
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "").strip()
     display_name = request.form.get("display_name", "").strip()
-    role         = request.form.get("role", "consultant")
+    role = request.form.get("role", "consultant")
     if not username or not password:
         flash("Username and password required.", "error")
         return redirect(url_for("admin_admins"))
@@ -1418,7 +1656,7 @@ def admin_add_admin():
         with get_db() as conn:
             conn.execute(
                 "INSERT INTO admin_users (username, password_hash, display_name, role, created_at) VALUES (?,?,?,?,?)",
-                (username, pw_hash, display_name or username, role, now)
+                (username, pw_hash, display_name or username, role, now),
             )
             conn.commit()
         flash(f"Admin '{username}' created.", "success")
@@ -1440,6 +1678,7 @@ def admin_delete_admin(admin_id):
 
 # ─────────────────────────── REPORTS ──────────────────────────────
 
+
 @app.route("/admin/reports")
 @elevated_required
 def admin_reports():
@@ -1449,8 +1688,12 @@ def admin_reports():
         ).fetchall()
     now = datetime.utcnow()
     today_stats = compute_stats((now - timedelta(days=1)).isoformat(), now.isoformat())
-    return render_template("admin/reports.html", reports=reports, today_stats=today_stats,
-                           is_master=session.get("admin_role")=="master")
+    return render_template(
+        "admin/reports.html",
+        reports=reports,
+        today_stats=today_stats,
+        is_master=session.get("admin_role") == "master",
+    )
 
 
 @app.route("/admin/reports/generate/<report_type>", methods=["POST"])
@@ -1468,7 +1711,9 @@ def admin_generate_report(report_type):
 @elevated_required
 def admin_report_detail(report_id):
     with get_db() as conn:
-        report = conn.execute("SELECT * FROM ai_reports WHERE id=?", (report_id,)).fetchone()
+        report = conn.execute(
+            "SELECT * FROM ai_reports WHERE id=?", (report_id,)
+        ).fetchone()
     if not report:
         flash("Report not found.", "error")
         return redirect(url_for("admin_reports"))
@@ -1477,6 +1722,7 @@ def admin_report_detail(report_id):
 
 
 # ─────────────────────────── IMPORT CHAT ──────────────────────────
+
 
 @app.route("/admin/import-chat", methods=["GET", "POST"])
 @login_required
@@ -1496,7 +1742,10 @@ def admin_import_chat():
                 (raw, label, datetime.utcnow().isoformat()),
             )
             conn.commit()
-        flash(f"Import queued for @{raw}. The userbot will fetch the history shortly.", "success")
+        flash(
+            f"Import queued for @{raw}. The userbot will fetch the history shortly.",
+            "success",
+        )
         return redirect(url_for("admin_import_chat"))
 
     with get_db() as conn:
@@ -1510,7 +1759,9 @@ def admin_import_chat():
 @login_required
 def admin_import_status(req_id):
     with get_db() as conn:
-        row = conn.execute("SELECT * FROM import_requests WHERE id=?", (req_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM import_requests WHERE id=?", (req_id,)
+        ).fetchone()
     if not row:
         return jsonify({"error": "Not found"}), 404
     return jsonify(dict(row))

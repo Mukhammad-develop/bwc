@@ -6,7 +6,13 @@ import telebot
 from telebot import types
 
 import db
-from config import BOT_TOKEN, DB_PATH, TIMEZONE_OFFSET_HOURS, ADMIN_CHAT_ID, OPENAI_API_KEY
+from config import (
+    BOT_TOKEN,
+    DB_PATH,
+    TIMEZONE_OFFSET_HOURS,
+    ADMIN_CHAT_ID,
+    OPENAI_API_KEY,
+)
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
@@ -413,7 +419,9 @@ def t(lang: str, key: str, **kwargs):
     return text
 
 
-def footer(lang: str, next_key: str = "footer_continue", eta_key: str = "footer_update"):
+def footer(
+    lang: str, next_key: str = "footer_continue", eta_key: str = "footer_update"
+):
     return f"\n\n{t(lang, 'next', next=t(lang, next_key))}\n{t(lang, 'eta', eta=t(lang, eta_key))}"
 
 
@@ -440,6 +448,7 @@ def ask_ai(user_message: str, lang: str):
         return None
     try:
         from openai import OpenAI
+
         client = OpenAI(api_key=OPENAI_API_KEY)
         print("[AI] Calling OpenAI (gpt-4o-mini)...")
         response = client.chat.completions.create(
@@ -473,43 +482,93 @@ def lang_keyboard():
 
 def main_menu_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton(t(lang, "service_student"), callback_data="service_student"))
-    kb.add(types.InlineKeyboardButton(t(lang, "service_paye"), callback_data="service_paye"))
-    kb.add(types.InlineKeyboardButton(t(lang, "service_self"), callback_data="service_self"))
-    kb.add(types.InlineKeyboardButton(t(lang, "service_company"), callback_data="service_company"))
+    kb.add(
+        types.InlineKeyboardButton(
+            t(lang, "service_student"), callback_data="service_student"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            t(lang, "service_paye"), callback_data="service_paye"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            t(lang, "service_self"), callback_data="service_self"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            t(lang, "service_company"), callback_data="service_company"
+        )
+    )
     kb.add(types.InlineKeyboardButton(t(lang, "my_case_btn"), callback_data="my_case"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
-    kb.add(types.InlineKeyboardButton("🌐 " + t(lang, "change_lang"), callback_data="change_lang"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "🌐 " + t(lang, "change_lang"), callback_data="change_lang"
+        )
+    )
     return kb
 
 
 def back_menu_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu")
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def text_input_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
-    kb.add(types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu")
+    )
     return kb
 
 
 def start_back_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("▶️ " + t(lang, "start"), callback_data="start_flow"))
-    kb.add(types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton("▶️ " + t(lang, "start"), callback_data="start_flow")
+    )
+    kb.add(
+        types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu")
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def yes_no_kb(lang: str, yes_cb: str, no_cb: str):
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("✅ " + t(lang, "yes"), callback_data=yes_cb))
-    kb.add(types.InlineKeyboardButton("❌ " + t(lang, "no_not_sure"), callback_data=no_cb))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton("❌ " + t(lang, "no_not_sure"), callback_data=no_cb)
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
@@ -517,47 +576,105 @@ def document_select_kb(lang: str, docs):
     kb = types.InlineKeyboardMarkup()
     for d in docs:
         kb.add(types.InlineKeyboardButton(d, callback_data=f"doc_{d}"))
-    kb.add(types.InlineKeyboardButton("✔️ " + t(lang, "done_uploading"), callback_data="doc_done"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "✔️ " + t(lang, "done_uploading"), callback_data="doc_done"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def doc_wait_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("➖ " + t(lang, "doc_dont_have"), callback_data="doc_missing"))
-    kb.add(types.InlineKeyboardButton("↩️ " + t(lang, "doc_back_list"), callback_data="doc_back_list"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "➖ " + t(lang, "doc_dont_have"), callback_data="doc_missing"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "↩️ " + t(lang, "doc_back_list"), callback_data="doc_back_list"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def payment_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("💳 " + t(lang, "pay_online"), callback_data="pay_online"))
-    kb.add(types.InlineKeyboardButton("🏦 " + t(lang, "bank_transfer"), callback_data="pay_bank"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
-    kb.add(types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "💳 " + t(lang, "pay_online"), callback_data="pay_online"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "🏦 " + t(lang, "bank_transfer"), callback_data="pay_bank"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu")
+    )
     return kb
 
 
 def upload_payment_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📤 " + t(lang, "upload_payment"), callback_data="upload_payment"))
-    kb.add(types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📤 " + t(lang, "upload_payment"), callback_data="upload_payment"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu")
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def ai_chat_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu"))
+    kb.add(
+        types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu")
+    )
     return kb
 
 
 def upload_choice_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("✅ " + t(lang, "upload_now"), callback_data="upload_now"))
-    kb.add(types.InlineKeyboardButton("⏳ " + t(lang, "upload_later"), callback_data="upload_later"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "✅ " + t(lang, "upload_now"), callback_data="upload_now"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "⏳ " + t(lang, "upload_later"), callback_data="upload_later"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     kb.add(types.InlineKeyboardButton("🔙 " + t(lang, "back"), callback_data="menu"))
     return kb
 
@@ -609,7 +726,9 @@ def handle_help(message):
     with db.connect(DB_PATH) as conn:
         db.get_or_create_user(conn, message.from_user.id)
         lang = db.get_language(conn, message.from_user.id)
-    bot.send_message(message.chat.id, t(lang, "help_text"), reply_markup=main_menu_kb(lang))
+    bot.send_message(
+        message.chat.id, t(lang, "help_text"), reply_markup=main_menu_kb(lang)
+    )
 
 
 @bot.message_handler(commands=["mycase", "case"])
@@ -620,11 +739,24 @@ def handle_my_case(message):
         lang = db.get_language(conn, message.from_user.id)
         case = db.get_active_case(conn, user_id)
         if not case:
-            bot.send_message(message.chat.id, t(lang, "main_menu"), reply_markup=main_menu_kb(lang))
+            bot.send_message(
+                message.chat.id, t(lang, "main_menu"), reply_markup=main_menu_kb(lang)
+            )
             return
         missing = ", ".join(db.get_missing_docs(conn, case["id"])) or "-"
-        service_name = t(lang, "service_" + case["service"]) if case["service"] in ("student", "paye", "self", "company") else case["service"]
-        text = t(lang, "my_case", service=service_name, status=case["status"], payment=case["payment_status"], missing=missing)
+        service_name = (
+            t(lang, "service_" + case["service"])
+            if case["service"] in ("student", "paye", "self", "company")
+            else case["service"]
+        )
+        text = t(
+            lang,
+            "my_case",
+            service=service_name,
+            status=case["status"],
+            payment=case["payment_status"],
+            missing=missing,
+        )
         bot.send_message(message.chat.id, text, reply_markup=back_menu_kb(lang))
 
 
@@ -640,26 +772,42 @@ def handle_text(message):
             db.set_chat_mode(conn, message.from_user.id, "menu")
             case = db.get_active_case(conn, user_id)
             if not case:
-                bot.send_message(message.chat.id, t(lang, "welcome"), reply_markup=lang_keyboard())
+                bot.send_message(
+                    message.chat.id, t(lang, "welcome"), reply_markup=lang_keyboard()
+                )
             else:
-                bot.send_message(message.chat.id, t(lang, "main_menu"), reply_markup=main_menu_kb(lang))
+                bot.send_message(
+                    message.chat.id,
+                    t(lang, "main_menu"),
+                    reply_markup=main_menu_kb(lang),
+                )
             return
 
         if chat_mode == "ai":
             user_message = (message.text or "").strip()
             if not user_message:
-                bot.send_message(message.chat.id, t(lang, "chat_ai_intro"), reply_markup=ai_chat_kb(lang))
+                bot.send_message(
+                    message.chat.id,
+                    t(lang, "chat_ai_intro"),
+                    reply_markup=ai_chat_kb(lang),
+                )
                 return
             reply = ask_ai(user_message, lang)
             if reply:
                 bot.send_message(message.chat.id, reply, reply_markup=ai_chat_kb(lang))
             else:
-                bot.send_message(message.chat.id, t(lang, "chat_ai_error"), reply_markup=ai_chat_kb(lang))
+                bot.send_message(
+                    message.chat.id,
+                    t(lang, "chat_ai_error"),
+                    reply_markup=ai_chat_kb(lang),
+                )
             return
 
         case = db.get_active_case(conn, user_id)
         if not case:
-            bot.send_message(message.chat.id, t(lang, "welcome"), reply_markup=lang_keyboard())
+            bot.send_message(
+                message.chat.id, t(lang, "welcome"), reply_markup=lang_keyboard()
+            )
             return
 
         stage = case["stage"]
@@ -671,25 +819,41 @@ def handle_text(message):
                 return
             db.update_case(conn, case["id"], nationality=text)
             set_stage(conn, case["id"], "student_apply_from")
-            bot.send_message(message.chat.id, t(lang, "student_apply_from"), reply_markup=text_input_kb(lang))
+            bot.send_message(
+                message.chat.id,
+                t(lang, "student_apply_from"),
+                reply_markup=text_input_kb(lang),
+            )
             return
 
         if stage == "student_apply_from":
             db.update_case(conn, case["id"], applying_from=text)
             set_stage(conn, case["id"], "student_qa")
-            bot.send_message(message.chat.id, t(lang, "student_qa"), reply_markup=yes_no_kb(lang, "qa_yes", "qa_no"))
+            bot.send_message(
+                message.chat.id,
+                t(lang, "student_qa"),
+                reply_markup=yes_no_kb(lang, "qa_yes", "qa_no"),
+            )
             return
 
         if stage == "student_intake_other":
             db.update_case(conn, case["id"], intake=text)
             set_stage(conn, case["id"], "student_level")
-            bot.send_message(message.chat.id, t(lang, "student_level"), reply_markup=student_level_kb(lang))
+            bot.send_message(
+                message.chat.id,
+                t(lang, "student_level"),
+                reply_markup=student_level_kb(lang),
+            )
             return
 
         if stage == "student_level_other":
             db.update_case(conn, case["id"], level=text)
             set_stage(conn, case["id"], "student_english")
-            bot.send_message(message.chat.id, t(lang, "student_english"), reply_markup=yes_no_kb(lang, "eng_yes", "eng_no"))
+            bot.send_message(
+                message.chat.id,
+                t(lang, "student_english"),
+                reply_markup=yes_no_kb(lang, "eng_yes", "eng_no"),
+            )
             return
 
         if stage == "student_budget_other":
@@ -700,7 +864,11 @@ def handle_text(message):
         if stage == "paye_year_other":
             db.update_case(conn, case["id"], tax_year=text)
             set_stage(conn, case["id"], "paye_employment")
-            bot.send_message(message.chat.id, t(lang, "paye_employment"), reply_markup=paye_employment_kb(lang))
+            bot.send_message(
+                message.chat.id,
+                t(lang, "paye_employment"),
+                reply_markup=paye_employment_kb(lang),
+            )
             return
 
         if stage == "paye_ni_enter":
@@ -711,17 +879,28 @@ def handle_text(message):
         if stage == "self_year_other":
             db.update_case(conn, case["id"], tax_year=text)
             set_stage(conn, case["id"], "self_income")
-            bot.send_message(message.chat.id, t(lang, "self_income"), reply_markup=self_income_kb(lang))
+            bot.send_message(
+                message.chat.id,
+                t(lang, "self_income"),
+                reply_markup=self_income_kb(lang),
+            )
             return
 
         if stage == "company_number_enter":
             db.update_case(conn, case["id"], company_number=text)
             set_stage(conn, case["id"], "company_need")
-            bot.send_message(message.chat.id, t(lang, "company_need"), reply_markup=company_need_kb(lang))
+            bot.send_message(
+                message.chat.id,
+                t(lang, "company_need"),
+                reply_markup=company_need_kb(lang),
+            )
             return
 
         # Default: show menu
-        bot.send_message(message.chat.id, t(lang, "main_menu"), reply_markup=main_menu_kb(lang))
+        bot.send_message(
+            message.chat.id, t(lang, "main_menu"), reply_markup=main_menu_kb(lang)
+        )
+
 
 @bot.message_handler(content_types=["document", "photo"])
 def handle_document(message):
@@ -731,25 +910,46 @@ def handle_document(message):
         lang = db.get_language(conn, message.from_user.id)
         case = db.get_active_case(conn, user_id)
         if not case:
-            bot.send_message(message.chat.id, t(lang, "main_menu"), reply_markup=main_menu_kb(lang))
+            bot.send_message(
+                message.chat.id, t(lang, "main_menu"), reply_markup=main_menu_kb(lang)
+            )
             return
 
         if case["awaiting_payment_proof"] == 1:
             file_id, file_unique_id = extract_file_ids(message)
-            db.add_payment(conn, case["id"], method="unknown", status="proof_received", proof_file_id=file_id)
-            db.update_case(conn, case["id"], payment_status="proof_received", awaiting_payment_proof=0)
-            bot.send_message(message.chat.id, t(lang, "doc_received"), reply_markup=back_menu_kb(lang))
+            db.add_payment(
+                conn,
+                case["id"],
+                method="unknown",
+                status="proof_received",
+                proof_file_id=file_id,
+            )
+            db.update_case(
+                conn,
+                case["id"],
+                payment_status="proof_received",
+                awaiting_payment_proof=0,
+            )
+            bot.send_message(
+                message.chat.id,
+                t(lang, "doc_received"),
+                reply_markup=back_menu_kb(lang),
+            )
             return
 
         if case["awaiting_doc_type"]:
             file_id, file_unique_id = extract_file_ids(message)
-            db.add_document(conn, case["id"], case["awaiting_doc_type"], file_id, file_unique_id)
+            db.add_document(
+                conn, case["id"], case["awaiting_doc_type"], file_id, file_unique_id
+            )
             db.update_case(conn, case["id"], awaiting_doc_type=None)
             bot.send_message(message.chat.id, t(lang, "doc_received"))
             show_doc_upload_menu(message.chat.id, conn, case, lang)
             return
 
-        bot.send_message(message.chat.id, t(lang, "main_menu"), reply_markup=main_menu_kb(lang))
+        bot.send_message(
+            message.chat.id, t(lang, "main_menu"), reply_markup=main_menu_kb(lang)
+        )
 
 
 @bot.callback_query_handler(func=lambda call: True)
@@ -762,21 +962,41 @@ def handle_callback(call):
         if data.startswith("lang_"):
             lang_code = data.split("_")[1]
             db.set_language(conn, call.from_user.id, lang_code)
-            bot.edit_message_text(t(lang_code, "main_menu"), call.message.chat.id, call.message.message_id, reply_markup=main_menu_kb(lang_code))
+            bot.edit_message_text(
+                t(lang_code, "main_menu"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=main_menu_kb(lang_code),
+            )
             return
 
         if data == "change_lang":
-            bot.edit_message_text(t(lang, "welcome"), call.message.chat.id, call.message.message_id, reply_markup=lang_keyboard())
+            bot.edit_message_text(
+                t(lang, "welcome"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=lang_keyboard(),
+            )
             return
 
         if data == "menu":
             db.set_chat_mode(conn, call.from_user.id, "menu")
-            bot.edit_message_text(t(lang, "main_menu"), call.message.chat.id, call.message.message_id, reply_markup=main_menu_kb(lang))
+            bot.edit_message_text(
+                t(lang, "main_menu"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=main_menu_kb(lang),
+            )
             return
 
         if data == "chat_ai":
             db.set_chat_mode(conn, call.from_user.id, "ai")
-            bot.edit_message_text(t(lang, "chat_ai_intro"), call.message.chat.id, call.message.message_id, reply_markup=ai_chat_kb(lang))
+            bot.edit_message_text(
+                t(lang, "chat_ai_intro"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=ai_chat_kb(lang),
+            )
             return
 
         if data.startswith("service_"):
@@ -784,41 +1004,90 @@ def handle_callback(call):
             case = ensure_case(conn, user_id, service)
             if service == "student":
                 set_stage(conn, case["id"], "student_intro")
-                bot.edit_message_text(t(lang, "student_intro") + footer(lang, "footer_questions", "footer_2_3_min"), call.message.chat.id, call.message.message_id, reply_markup=start_back_kb(lang))
+                bot.edit_message_text(
+                    t(lang, "student_intro")
+                    + footer(lang, "footer_questions", "footer_2_3_min"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=start_back_kb(lang),
+                )
                 return
             if service == "paye":
                 set_stage(conn, case["id"], "paye_intro")
-                bot.edit_message_text(t(lang, "paye_intro") + footer(lang, "footer_eligibility", "footer_2_3_min"), call.message.chat.id, call.message.message_id, reply_markup=start_back_kb(lang))
+                bot.edit_message_text(
+                    t(lang, "paye_intro")
+                    + footer(lang, "footer_eligibility", "footer_2_3_min"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=start_back_kb(lang),
+                )
                 return
             if service == "self":
                 set_stage(conn, case["id"], "self_intro")
-                bot.edit_message_text(t(lang, "self_intro") + footer(lang, "footer_questions", "footer_2_3_min"), call.message.chat.id, call.message.message_id, reply_markup=start_back_kb(lang))
+                bot.edit_message_text(
+                    t(lang, "self_intro")
+                    + footer(lang, "footer_questions", "footer_2_3_min"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=start_back_kb(lang),
+                )
                 return
             if service == "company":
                 set_stage(conn, case["id"], "company_intro")
-                bot.edit_message_text(t(lang, "company_intro") + footer(lang, "footer_questions", "footer_2_3_min"), call.message.chat.id, call.message.message_id, reply_markup=start_back_kb(lang))
+                bot.edit_message_text(
+                    t(lang, "company_intro")
+                    + footer(lang, "footer_questions", "footer_2_3_min"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=start_back_kb(lang),
+                )
                 return
 
         if data == "start_flow":
             case = db.get_active_case(conn, user_id)
             if not case:
-                bot.edit_message_text(t(lang, "main_menu"), call.message.chat.id, call.message.message_id, reply_markup=main_menu_kb(lang))
+                bot.edit_message_text(
+                    t(lang, "main_menu"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=main_menu_kb(lang),
+                )
                 return
             if case["service"] == "student":
                 set_stage(conn, case["id"], "student_nationality")
-                bot.edit_message_text(t(lang, "student_nationality"), call.message.chat.id, call.message.message_id, reply_markup=text_input_kb(lang))
+                bot.edit_message_text(
+                    t(lang, "student_nationality"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=text_input_kb(lang),
+                )
                 return
             if case["service"] == "paye":
                 set_stage(conn, case["id"], "paye_worked")
-                bot.edit_message_text(t(lang, "paye_worked"), call.message.chat.id, call.message.message_id, reply_markup=yes_no_kb(lang, "paye_yes", "paye_no"))
+                bot.edit_message_text(
+                    t(lang, "paye_worked"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=yes_no_kb(lang, "paye_yes", "paye_no"),
+                )
                 return
             if case["service"] == "self":
                 set_stage(conn, case["id"], "self_registered")
-                bot.edit_message_text(t(lang, "self_registered"), call.message.chat.id, call.message.message_id, reply_markup=self_registered_kb(lang))
+                bot.edit_message_text(
+                    t(lang, "self_registered"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=self_registered_kb(lang),
+                )
                 return
             if case["service"] == "company":
                 set_stage(conn, case["id"], "company_type")
-                bot.edit_message_text(t(lang, "company_type"), call.message.chat.id, call.message.message_id, reply_markup=company_type_kb(lang))
+                bot.edit_message_text(
+                    t(lang, "company_type"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=company_type_kb(lang),
+                )
                 return
 
         # Student flow callbacks
@@ -826,20 +1095,35 @@ def handle_callback(call):
             case = db.get_active_case(conn, user_id)
             db.update_case(conn, case["id"], qa_partner=1)
             set_stage(conn, case["id"], "student_intake")
-            bot.edit_message_text(t(lang, "student_intake"), call.message.chat.id, call.message.message_id, reply_markup=student_intake_kb(lang))
+            bot.edit_message_text(
+                t(lang, "student_intake"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=student_intake_kb(lang),
+            )
             return
 
         if data == "qa_no":
             case = db.get_active_case(conn, user_id)
             db.update_case(conn, case["id"], qa_partner=0)
             set_stage(conn, case["id"], "student_intake")
-            bot.edit_message_text(t(lang, "student_intake"), call.message.chat.id, call.message.message_id, reply_markup=student_intake_kb(lang))
+            bot.edit_message_text(
+                t(lang, "student_intake"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=student_intake_kb(lang),
+            )
             return
 
         if data == "intake_other":
             case = db.get_active_case(conn, user_id)
             set_stage(conn, case["id"], "student_intake_other")
-            bot.edit_message_text(t(lang, "student_intake"), call.message.chat.id, call.message.message_id, reply_markup=text_input_kb(lang))
+            bot.edit_message_text(
+                t(lang, "student_intake"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=text_input_kb(lang),
+            )
             return
 
         if data.startswith("intake_"):
@@ -847,13 +1131,23 @@ def handle_callback(call):
             intake = data.split("_")[1]
             db.update_case(conn, case["id"], intake=intake)
             set_stage(conn, case["id"], "student_level")
-            bot.edit_message_text(t(lang, "student_level"), call.message.chat.id, call.message.message_id, reply_markup=student_level_kb(lang))
+            bot.edit_message_text(
+                t(lang, "student_level"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=student_level_kb(lang),
+            )
             return
 
         if data == "level_other":
             case = db.get_active_case(conn, user_id)
             set_stage(conn, case["id"], "student_level_other")
-            bot.edit_message_text(t(lang, "student_level"), call.message.chat.id, call.message.message_id, reply_markup=text_input_kb(lang))
+            bot.edit_message_text(
+                t(lang, "student_level"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=text_input_kb(lang),
+            )
             return
 
         if data.startswith("level_"):
@@ -861,51 +1155,88 @@ def handle_callback(call):
             level = data.split("_")[1]
             db.update_case(conn, case["id"], level=level)
             set_stage(conn, case["id"], "student_english")
-            bot.edit_message_text(t(lang, "student_english"), call.message.chat.id, call.message.message_id, reply_markup=yes_no_kb(lang, "eng_yes", "eng_no"))
+            bot.edit_message_text(
+                t(lang, "student_english"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=yes_no_kb(lang, "eng_yes", "eng_no"),
+            )
             return
 
         if data == "eng_yes":
             case = db.get_active_case(conn, user_id)
             db.update_case(conn, case["id"], english_test="yes")
             set_stage(conn, case["id"], "student_budget")
-            bot.edit_message_text(t(lang, "student_budget"), call.message.chat.id, call.message.message_id, reply_markup=student_budget_kb(lang))
+            bot.edit_message_text(
+                t(lang, "student_budget"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=student_budget_kb(lang),
+            )
             return
 
         if data == "eng_no":
             case = db.get_active_case(conn, user_id)
             db.update_case(conn, case["id"], english_test="no")
             set_stage(conn, case["id"], "student_budget")
-            bot.edit_message_text(t(lang, "student_budget"), call.message.chat.id, call.message.message_id, reply_markup=student_budget_kb(lang))
+            bot.edit_message_text(
+                t(lang, "student_budget"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=student_budget_kb(lang),
+            )
             return
 
         if data == "budget_other":
             case = db.get_active_case(conn, user_id)
             set_stage(conn, case["id"], "student_budget_other")
-            bot.edit_message_text(t(lang, "student_budget"), call.message.chat.id, call.message.message_id, reply_markup=text_input_kb(lang))
+            bot.edit_message_text(
+                t(lang, "student_budget"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=text_input_kb(lang),
+            )
             return
 
         if data.startswith("budget_"):
             case = db.get_active_case(conn, user_id)
             budget = data.split("_")[1]
             db.update_case(conn, case["id"], budget=budget)
-            send_student_summary(call.message.chat.id, conn, case["id"], lang, edit=call)
+            send_student_summary(
+                call.message.chat.id, conn, case["id"], lang, edit=call
+            )
             return
 
         # PAYE flow callbacks
         if data == "paye_yes":
             case = db.get_active_case(conn, user_id)
             set_stage(conn, case["id"], "paye_year")
-            bot.edit_message_text(t(lang, "paye_year"), call.message.chat.id, call.message.message_id, reply_markup=paye_year_kb(lang))
+            bot.edit_message_text(
+                t(lang, "paye_year"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=paye_year_kb(lang),
+            )
             return
 
         if data == "paye_no":
-            bot.edit_message_text(t(lang, "paye_not_eligible"), call.message.chat.id, call.message.message_id, reply_markup=back_menu_kb(lang))
+            bot.edit_message_text(
+                t(lang, "paye_not_eligible"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=back_menu_kb(lang),
+            )
             return
 
         if data == "paye_year_other":
             case = db.get_active_case(conn, user_id)
             set_stage(conn, case["id"], "paye_year_other")
-            bot.edit_message_text(t(lang, "paye_year"), call.message.chat.id, call.message.message_id, reply_markup=text_input_kb(lang))
+            bot.edit_message_text(
+                t(lang, "paye_year"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=text_input_kb(lang),
+            )
             return
 
         if data.startswith("paye_year_"):
@@ -913,7 +1244,12 @@ def handle_callback(call):
             tax_year = data.split("_", 2)[2]
             db.update_case(conn, case["id"], tax_year=tax_year)
             set_stage(conn, case["id"], "paye_employment")
-            bot.edit_message_text(t(lang, "paye_employment"), call.message.chat.id, call.message.message_id, reply_markup=paye_employment_kb(lang))
+            bot.edit_message_text(
+                t(lang, "paye_employment"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=paye_employment_kb(lang),
+            )
             return
 
         if data.startswith("paye_emp_"):
@@ -921,7 +1257,12 @@ def handle_callback(call):
             emp = data.split("_", 2)[2]
             db.update_case(conn, case["id"], employment_type=emp)
             set_stage(conn, case["id"], "paye_docs_available")
-            bot.edit_message_text(t(lang, "paye_docs_available"), call.message.chat.id, call.message.message_id, reply_markup=paye_docs_available_kb(lang))
+            bot.edit_message_text(
+                t(lang, "paye_docs_available"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=paye_docs_available_kb(lang),
+            )
             return
 
         if data.startswith("paye_dochave_"):
@@ -929,13 +1270,23 @@ def handle_callback(call):
             docs = data.split("_", 2)[2]
             db.update_case(conn, case["id"], docs_available=docs)
             set_stage(conn, case["id"], "paye_ni")
-            bot.edit_message_text(t(lang, "paye_ni"), call.message.chat.id, call.message.message_id, reply_markup=paye_ni_kb(lang))
+            bot.edit_message_text(
+                t(lang, "paye_ni"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=paye_ni_kb(lang),
+            )
             return
 
         if data == "paye_ni_yes":
             case = db.get_active_case(conn, user_id)
             set_stage(conn, case["id"], "paye_ni_enter")
-            bot.edit_message_text(t(lang, "paye_ni"), call.message.chat.id, call.message.message_id, reply_markup=text_input_kb(lang))
+            bot.edit_message_text(
+                t(lang, "paye_ni"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=text_input_kb(lang),
+            )
             return
 
         if data == "paye_ni_no":
@@ -950,13 +1301,23 @@ def handle_callback(call):
             value = data.split("_", 2)[2]
             db.update_case(conn, case["id"], self_employed_registered=value)
             set_stage(conn, case["id"], "self_year")
-            bot.edit_message_text(t(lang, "self_year"), call.message.chat.id, call.message.message_id, reply_markup=self_year_kb(lang))
+            bot.edit_message_text(
+                t(lang, "self_year"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=self_year_kb(lang),
+            )
             return
 
         if data == "self_year_other":
             case = db.get_active_case(conn, user_id)
             set_stage(conn, case["id"], "self_year_other")
-            bot.edit_message_text(t(lang, "self_year"), call.message.chat.id, call.message.message_id, reply_markup=text_input_kb(lang))
+            bot.edit_message_text(
+                t(lang, "self_year"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=text_input_kb(lang),
+            )
             return
 
         if data.startswith("self_year_"):
@@ -964,7 +1325,12 @@ def handle_callback(call):
             tax_year = data.split("_", 2)[2]
             db.update_case(conn, case["id"], tax_year=tax_year)
             set_stage(conn, case["id"], "self_income")
-            bot.edit_message_text(t(lang, "self_income"), call.message.chat.id, call.message.message_id, reply_markup=self_income_kb(lang))
+            bot.edit_message_text(
+                t(lang, "self_income"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=self_income_kb(lang),
+            )
             return
 
         if data.startswith("self_income_"):
@@ -972,7 +1338,12 @@ def handle_callback(call):
             income = data.split("_", 2)[2]
             db.update_case(conn, case["id"], income_range=income)
             set_stage(conn, case["id"], "self_expenses")
-            bot.edit_message_text(t(lang, "self_expenses"), call.message.chat.id, call.message.message_id, reply_markup=self_expenses_kb(lang))
+            bot.edit_message_text(
+                t(lang, "self_expenses"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=self_expenses_kb(lang),
+            )
             return
 
         if data.startswith("self_exp_"):
@@ -980,13 +1351,23 @@ def handle_callback(call):
             exp = data.split("_", 2)[2]
             db.update_case(conn, case["id"], expenses_records=exp)
             set_stage(conn, case["id"], "self_urgent")
-            bot.edit_message_text(t(lang, "self_urgent"), call.message.chat.id, call.message.message_id, reply_markup=self_urgent_kb(lang))
+            bot.edit_message_text(
+                t(lang, "self_urgent"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=self_urgent_kb(lang),
+            )
             return
 
         if data.startswith("self_urgent_"):
             case = db.get_active_case(conn, user_id)
             urgent = data.split("_", 2)[2]
-            db.update_case(conn, case["id"], urgent=urgent, priority="high" if urgent == "urgent" else None)
+            db.update_case(
+                conn,
+                case["id"],
+                urgent=urgent,
+                priority="high" if urgent == "urgent" else None,
+            )
             send_self_docs(call.message.chat.id, conn, case["id"], lang, edit=call)
             return
 
@@ -996,20 +1377,35 @@ def handle_callback(call):
             company_type = data.split("_", 2)[2]
             db.update_case(conn, case["id"], company_type=company_type)
             set_stage(conn, case["id"], "company_number")
-            bot.edit_message_text(t(lang, "company_number"), call.message.chat.id, call.message.message_id, reply_markup=company_number_kb(lang))
+            bot.edit_message_text(
+                t(lang, "company_number"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=company_number_kb(lang),
+            )
             return
 
         if data == "company_number_yes":
             case = db.get_active_case(conn, user_id)
             set_stage(conn, case["id"], "company_number_enter")
-            bot.edit_message_text(t(lang, "company_number"), call.message.chat.id, call.message.message_id, reply_markup=text_input_kb(lang))
+            bot.edit_message_text(
+                t(lang, "company_number"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=text_input_kb(lang),
+            )
             return
 
         if data == "company_number_no":
             case = db.get_active_case(conn, user_id)
             db.update_case(conn, case["id"], company_number=None)
             set_stage(conn, case["id"], "company_need")
-            bot.edit_message_text(t(lang, "company_need"), call.message.chat.id, call.message.message_id, reply_markup=company_need_kb(lang))
+            bot.edit_message_text(
+                t(lang, "company_need"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=company_need_kb(lang),
+            )
             return
 
         if data.startswith("company_need_"):
@@ -1017,7 +1413,12 @@ def handle_callback(call):
             need = data.split("_", 2)[2]
             db.update_case(conn, case["id"], company_need=need)
             set_stage(conn, case["id"], "company_activity")
-            bot.edit_message_text(t(lang, "company_activity"), call.message.chat.id, call.message.message_id, reply_markup=company_activity_kb(lang))
+            bot.edit_message_text(
+                t(lang, "company_activity"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=company_activity_kb(lang),
+            )
             return
 
         if data.startswith("company_activity_"):
@@ -1025,7 +1426,12 @@ def handle_callback(call):
             activity = data.split("_", 2)[2]
             db.update_case(conn, case["id"], company_activity=activity)
             set_stage(conn, case["id"], "company_urgent")
-            bot.edit_message_text(t(lang, "company_urgent"), call.message.chat.id, call.message.message_id, reply_markup=company_urgent_kb(lang))
+            bot.edit_message_text(
+                t(lang, "company_urgent"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=company_urgent_kb(lang),
+            )
             return
 
         if data.startswith("company_urgent_"):
@@ -1040,7 +1446,9 @@ def handle_callback(call):
             case = db.get_active_case(conn, user_id)
             db.update_case(conn, case["id"], status="waiting_documents")
             checklist = doc_checklist_text(lang, case["service"])
-            bot.edit_message_text(checklist, call.message.chat.id, call.message.message_id)
+            bot.edit_message_text(
+                checklist, call.message.chat.id, call.message.message_id
+            )
             show_doc_upload_menu(call.message.chat.id, conn, case, lang)
             return
 
@@ -1048,7 +1456,12 @@ def handle_callback(call):
             case = db.get_active_case(conn, user_id)
             db.update_case(conn, case["id"], status="waiting_documents")
             schedule_doc_reminders(conn, case["id"])
-            bot.edit_message_text(t(lang, "privacy"), call.message.chat.id, call.message.message_id, reply_markup=back_menu_kb(lang))
+            bot.edit_message_text(
+                t(lang, "privacy"),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=back_menu_kb(lang),
+            )
             return
 
         if data.startswith("doc_"):
@@ -1057,7 +1470,11 @@ def handle_callback(call):
                 missing = db.get_missing_docs(conn, case["id"])
                 awaiting = case["awaiting_doc_type"]
                 if not awaiting:
-                    bot.edit_message_text(t(lang, "choose_doc_first"), call.message.chat.id, call.message.message_id)
+                    bot.edit_message_text(
+                        t(lang, "choose_doc_first"),
+                        call.message.chat.id,
+                        call.message.message_id,
+                    )
                     show_doc_upload_menu(call.message.chat.id, conn, case, lang)
                     return
                 if awaiting and awaiting not in missing:
@@ -1071,11 +1488,21 @@ def handle_callback(call):
                 show_doc_upload_menu(call.message.chat.id, conn, case, lang, edit=call)
                 return
             if data == "doc_done":
-                bot.edit_message_text(t(lang, "payment_method"), call.message.chat.id, call.message.message_id, reply_markup=payment_kb(lang))
+                bot.edit_message_text(
+                    t(lang, "payment_method"),
+                    call.message.chat.id,
+                    call.message.message_id,
+                    reply_markup=payment_kb(lang),
+                )
                 return
             doc_name = data[4:]
             db.update_case(conn, case["id"], awaiting_doc_type=doc_name)
-            bot.edit_message_text(t(lang, "send_doc", doc=doc_name), call.message.chat.id, call.message.message_id, reply_markup=doc_wait_kb(lang))
+            bot.edit_message_text(
+                t(lang, "send_doc", doc=doc_name),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=doc_wait_kb(lang),
+            )
             return
 
         if data == "pay_online":
@@ -1083,7 +1510,17 @@ def handle_callback(call):
             db.update_case(conn, case["id"], payment_status="pending")
             db.add_payment(conn, case["id"], method="online", status="pending")
             ref = f"BW-{case['id']}-{call.from_user.first_name}"
-            bot.edit_message_text(t(lang, "payment_instructions_online", link="https://pay.example.com", ref=ref), call.message.chat.id, call.message.message_id, reply_markup=upload_payment_kb(lang))
+            bot.edit_message_text(
+                t(
+                    lang,
+                    "payment_instructions_online",
+                    link="https://pay.example.com",
+                    ref=ref,
+                ),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=upload_payment_kb(lang),
+            )
             schedule_payment_reminders(conn, case["id"])
             return
 
@@ -1092,43 +1529,98 @@ def handle_callback(call):
             db.update_case(conn, case["id"], payment_status="pending")
             db.add_payment(conn, case["id"], method="bank", status="pending")
             ref = f"BW-{case['id']}-{call.from_user.first_name}"
-            bot.edit_message_text(t(lang, "payment_instructions_bank", bank="HSBC / Sort code 00-00-00 / Acc 00000000", ref=ref), call.message.chat.id, call.message.message_id, reply_markup=upload_payment_kb(lang))
+            bot.edit_message_text(
+                t(
+                    lang,
+                    "payment_instructions_bank",
+                    bank="HSBC / Sort code 00-00-00 / Acc 00000000",
+                    ref=ref,
+                ),
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=upload_payment_kb(lang),
+            )
             schedule_payment_reminders(conn, case["id"])
             return
 
         if data == "upload_payment":
             case = db.get_active_case(conn, user_id)
             db.update_case(conn, case["id"], awaiting_payment_proof=1)
-            bot.edit_message_text(t(lang, "upload_payment_prompt"), call.message.chat.id, call.message.message_id)
+            bot.edit_message_text(
+                t(lang, "upload_payment_prompt"),
+                call.message.chat.id,
+                call.message.message_id,
+            )
             return
 
         if data == "my_case":
             case = db.get_active_case(conn, user_id)
             missing = ", ".join(db.get_missing_docs(conn, case["id"])) or "-"
-            service_name = t(lang, "service_" + case["service"]) if case["service"] in ("student", "paye", "self", "company") else case["service"]
-            text = t(lang, "my_case", service=service_name, status=case["status"], payment=case["payment_status"], missing=missing)
-            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=back_menu_kb(lang))
+            service_name = (
+                t(lang, "service_" + case["service"])
+                if case["service"] in ("student", "paye", "self", "company")
+                else case["service"]
+            )
+            text = t(
+                lang,
+                "my_case",
+                service=service_name,
+                status=case["status"],
+                payment=case["payment_status"],
+                missing=missing,
+            )
+            bot.edit_message_text(
+                text,
+                call.message.chat.id,
+                call.message.message_id,
+                reply_markup=back_menu_kb(lang),
+            )
             return
-
 
 
 def student_intake_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("🌸 " + t(lang, "intake_mar_apr"), callback_data="intake_march_april"))
-    kb.add(types.InlineKeyboardButton("🍂 " + t(lang, "intake_sep"), callback_data="intake_september"))
-    kb.add(types.InlineKeyboardButton("📝 " + t(lang, "other"), callback_data="intake_other"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "🌸 " + t(lang, "intake_mar_apr"), callback_data="intake_march_april"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "🍂 " + t(lang, "intake_sep"), callback_data="intake_september"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📝 " + t(lang, "other"), callback_data="intake_other"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def student_level_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📚 Foundation", callback_data="level_foundation"))
+    kb.add(
+        types.InlineKeyboardButton("📚 Foundation", callback_data="level_foundation")
+    )
     kb.add(types.InlineKeyboardButton("🎓 Bachelor’s", callback_data="level_bachelors"))
     kb.add(types.InlineKeyboardButton("🎓 Master's", callback_data="level_masters"))
-    kb.add(types.InlineKeyboardButton("🗣️ English course / Pre-sessional", callback_data="level_english"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "🗣️ English course / Pre-sessional", callback_data="level_english"
+        )
+    )
     kb.add(types.InlineKeyboardButton("📝 Other", callback_data="level_other"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
@@ -1138,9 +1630,15 @@ def student_budget_kb(lang: str):
     kb.add(types.InlineKeyboardButton("💰 £10k–£15k", callback_data="budget_10_15"))
     kb.add(types.InlineKeyboardButton("💰 £15k–£20k", callback_data="budget_15_20"))
     kb.add(types.InlineKeyboardButton("💰 £20k+", callback_data="budget_20_plus"))
-    kb.add(types.InlineKeyboardButton("🤐 Prefer not to say", callback_data="budget_no"))
+    kb.add(
+        types.InlineKeyboardButton("🤐 Prefer not to say", callback_data="budget_no")
+    )
     kb.add(types.InlineKeyboardButton("📝 Other", callback_data="budget_other"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
@@ -1149,18 +1647,46 @@ def paye_year_kb(lang: str):
     kb.add(types.InlineKeyboardButton("2025/26", callback_data="paye_year_2025_26"))
     kb.add(types.InlineKeyboardButton("2024/25", callback_data="paye_year_2024_25"))
     kb.add(types.InlineKeyboardButton("2023/24", callback_data="paye_year_2023_24"))
-    kb.add(types.InlineKeyboardButton("📅 " + t(lang, "paye_year_older"), callback_data="paye_year_other"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📅 " + t(lang, "paye_year_older"), callback_data="paye_year_other"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def paye_employment_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("👤 " + t(lang, "paye_emp_one"), callback_data="paye_emp_one"))
-    kb.add(types.InlineKeyboardButton("👥 " + t(lang, "paye_emp_multi"), callback_data="paye_emp_multi"))
-    kb.add(types.InlineKeyboardButton("🏢 " + t(lang, "paye_emp_agency"), callback_data="paye_emp_agency"))
-    kb.add(types.InlineKeyboardButton("❓ " + t(lang, "not_sure"), callback_data="paye_emp_not_sure"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "👤 " + t(lang, "paye_emp_one"), callback_data="paye_emp_one"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "👥 " + t(lang, "paye_emp_multi"), callback_data="paye_emp_multi"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "🏢 " + t(lang, "paye_emp_agency"), callback_data="paye_emp_agency"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "❓ " + t(lang, "not_sure"), callback_data="paye_emp_not_sure"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
@@ -1168,27 +1694,61 @@ def paye_docs_available_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("📄 P60", callback_data="paye_dochave_p60"))
     kb.add(types.InlineKeyboardButton("📄 P45", callback_data="paye_dochave_p45"))
-    kb.add(types.InlineKeyboardButton("📋 Payslips", callback_data="paye_dochave_payslips"))
-    kb.add(types.InlineKeyboardButton("✉️ HMRC letters", callback_data="paye_dochave_hmrc"))
+    kb.add(
+        types.InlineKeyboardButton("📋 Payslips", callback_data="paye_dochave_payslips")
+    )
+    kb.add(
+        types.InlineKeyboardButton("✉️ HMRC letters", callback_data="paye_dochave_hmrc")
+    )
     kb.add(types.InlineKeyboardButton("➖ None", callback_data="paye_dochave_none"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def paye_ni_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("✅ " + t(lang, "paye_ni_yes"), callback_data="paye_ni_yes"))
-    kb.add(types.InlineKeyboardButton("❌ " + t(lang, "paye_ni_no"), callback_data="paye_ni_no"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "✅ " + t(lang, "paye_ni_yes"), callback_data="paye_ni_yes"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "❌ " + t(lang, "paye_ni_no"), callback_data="paye_ni_no"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def self_registered_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("✅ " + t(lang, "yes"), callback_data="self_reg_yes"))
-    kb.add(types.InlineKeyboardButton("❌ " + t(lang, "no_not_sure").split(" / ")[0], callback_data="self_reg_no"))
-    kb.add(types.InlineKeyboardButton("❓ " + t(lang, "not_sure"), callback_data="self_reg_not_sure"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton("✅ " + t(lang, "yes"), callback_data="self_reg_yes")
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "❌ " + t(lang, "no_not_sure").split(" / ")[0], callback_data="self_reg_no"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "❓ " + t(lang, "not_sure"), callback_data="self_reg_not_sure"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
@@ -1196,85 +1756,234 @@ def self_year_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("📅 2024/25", callback_data="self_year_2024_25"))
     kb.add(types.InlineKeyboardButton("📅 2023/24", callback_data="self_year_2023_24"))
-    kb.add(types.InlineKeyboardButton("📝 " + t(lang, "other"), callback_data="self_year_other"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📝 " + t(lang, "other"), callback_data="self_year_other"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def self_income_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("💰 Under £10k", callback_data="self_income_under10"))
-    kb.add(types.InlineKeyboardButton("💰 £10k–£30k", callback_data="self_income_10_30"))
-    kb.add(types.InlineKeyboardButton("💰 £30k–£60k", callback_data="self_income_30_60"))
+    kb.add(
+        types.InlineKeyboardButton("💰 Under £10k", callback_data="self_income_under10")
+    )
+    kb.add(
+        types.InlineKeyboardButton("💰 £10k–£30k", callback_data="self_income_10_30")
+    )
+    kb.add(
+        types.InlineKeyboardButton("💰 £30k–£60k", callback_data="self_income_30_60")
+    )
     kb.add(types.InlineKeyboardButton("💰 £60k+", callback_data="self_income_60_plus"))
-    kb.add(types.InlineKeyboardButton("🤐 Prefer not to say", callback_data="self_income_no"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "🤐 Prefer not to say", callback_data="self_income_no"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def self_expenses_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("✅ " + t(lang, "yes"), callback_data="self_exp_yes"))
-    kb.add(types.InlineKeyboardButton("❌ " + t(lang, "no_not_sure").split(" / ")[0], callback_data="self_exp_no"))
-    kb.add(types.InlineKeyboardButton("❓ " + t(lang, "not_sure"), callback_data="self_exp_not_sure"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton("✅ " + t(lang, "yes"), callback_data="self_exp_yes")
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "❌ " + t(lang, "no_not_sure").split(" / ")[0], callback_data="self_exp_no"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "❓ " + t(lang, "not_sure"), callback_data="self_exp_not_sure"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def self_urgent_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("🚨 " + t(lang, "self_urgent_urgent"), callback_data="self_urgent_urgent"))
-    kb.add(types.InlineKeyboardButton("✅ " + t(lang, "self_urgent_normal"), callback_data="self_urgent_normal"))
-    kb.add(types.InlineKeyboardButton("❓ " + t(lang, "not_sure"), callback_data="self_urgent_not_sure"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "🚨 " + t(lang, "self_urgent_urgent"), callback_data="self_urgent_urgent"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "✅ " + t(lang, "self_urgent_normal"), callback_data="self_urgent_normal"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "❓ " + t(lang, "not_sure"), callback_data="self_urgent_not_sure"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def company_type_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("🏢 " + t(lang, "company_type_ltd"), callback_data="company_type_ltd"))
-    kb.add(types.InlineKeyboardButton("👤 " + t(lang, "company_type_sole"), callback_data="company_type_sole"))
-    kb.add(types.InlineKeyboardButton("📝 " + t(lang, "company_type_unreg"), callback_data="company_type_unregistered"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "🏢 " + t(lang, "company_type_ltd"), callback_data="company_type_ltd"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "👤 " + t(lang, "company_type_sole"), callback_data="company_type_sole"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📝 " + t(lang, "company_type_unreg"),
+            callback_data="company_type_unregistered",
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def company_number_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("✅ " + t(lang, "company_number_yes"), callback_data="company_number_yes"))
-    kb.add(types.InlineKeyboardButton("❌ " + t(lang, "company_number_no"), callback_data="company_number_no"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "✅ " + t(lang, "company_number_yes"), callback_data="company_number_yes"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "❌ " + t(lang, "company_number_no"), callback_data="company_number_no"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def company_need_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📊 Annual accounts + Corporation tax", callback_data="company_need_accounts"))
-    kb.add(types.InlineKeyboardButton("📒 Bookkeeping support", callback_data="company_need_bookkeeping"))
-    kb.add(types.InlineKeyboardButton("👥 Payroll / PAYE", callback_data="company_need_payroll"))
-    kb.add(types.InlineKeyboardButton("📦 VAT registration/returns", callback_data="company_need_vat"))
-    kb.add(types.InlineKeyboardButton("👤 Director Self Assessment", callback_data="company_need_director"))
-    kb.add(types.InlineKeyboardButton("📅 Ongoing monthly accounting", callback_data="company_need_monthly"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📊 Annual accounts + Corporation tax",
+            callback_data="company_need_accounts",
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📒 Bookkeeping support", callback_data="company_need_bookkeeping"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "👥 Payroll / PAYE", callback_data="company_need_payroll"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📦 VAT registration/returns", callback_data="company_need_vat"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "👤 Director Self Assessment", callback_data="company_need_director"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📅 Ongoing monthly accounting", callback_data="company_need_monthly"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def company_activity_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("🔵 " + t(lang, "company_activity_small"), callback_data="company_activity_small"))
-    kb.add(types.InlineKeyboardButton("🟡 " + t(lang, "company_activity_medium"), callback_data="company_activity_medium"))
-    kb.add(types.InlineKeyboardButton("🔴 " + t(lang, "company_activity_busy"), callback_data="company_activity_busy"))
-    kb.add(types.InlineKeyboardButton("❓ " + t(lang, "not_sure"), callback_data="company_activity_not_sure"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "🔵 " + t(lang, "company_activity_small"),
+            callback_data="company_activity_small",
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "🟡 " + t(lang, "company_activity_medium"),
+            callback_data="company_activity_medium",
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "🔴 " + t(lang, "company_activity_busy"),
+            callback_data="company_activity_busy",
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "❓ " + t(lang, "not_sure"), callback_data="company_activity_not_sure"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
 def company_urgent_kb(lang: str):
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("🚨 " + t(lang, "company_urgent_yes"), callback_data="company_urgent_yes"))
-    kb.add(types.InlineKeyboardButton("✅ " + t(lang, "company_urgent_no"), callback_data="company_urgent_no"))
-    kb.add(types.InlineKeyboardButton("❓ " + t(lang, "not_sure"), callback_data="company_urgent_not_sure"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "🚨 " + t(lang, "company_urgent_yes"), callback_data="company_urgent_yes"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "✅ " + t(lang, "company_urgent_no"), callback_data="company_urgent_no"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "❓ " + t(lang, "not_sure"), callback_data="company_urgent_not_sure"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
     return kb
 
 
@@ -1289,19 +1998,35 @@ def extract_file_ids(message):
 
 def send_student_summary(chat_id, conn, case_id, lang, edit=None):
     case = conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
-    text = t(
-        lang,
-        "student_summary",
-        applying_from=case["applying_from"] or "-",
-        level=case["level"] or "-",
-        intake=case["intake"] or "-",
-    ) + "\n\n" + t(lang, "visa_note")
+    text = (
+        t(
+            lang,
+            "student_summary",
+            applying_from=case["applying_from"] or "-",
+            level=case["level"] or "-",
+            intake=case["intake"] or "-",
+        )
+        + "\n\n"
+        + t(lang, "visa_note")
+    )
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📄 " + t(lang, "upload_docs_btn"), callback_data="upload_now"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
-    kb.add(types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📄 " + t(lang, "upload_docs_btn"), callback_data="upload_now"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu")
+    )
     if edit:
-        bot.edit_message_text(text, edit.message.chat.id, edit.message.message_id, reply_markup=kb)
+        bot.edit_message_text(
+            text, edit.message.chat.id, edit.message.message_id, reply_markup=kb
+        )
     else:
         bot.send_message(chat_id, text, reply_markup=kb)
 
@@ -1310,11 +2035,23 @@ def send_paye_summary(chat_id, conn, case_id, lang, edit=None):
     case = conn.execute("SELECT * FROM cases WHERE id = ?", (case_id,)).fetchone()
     text = t(lang, "paye_summary") + "\n\n" + t(lang, "tax_note")
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📄 " + t(lang, "upload_docs_btn"), callback_data="upload_now"))
-    kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
-    kb.add(types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu"))
+    kb.add(
+        types.InlineKeyboardButton(
+            "📄 " + t(lang, "upload_docs_btn"), callback_data="upload_now"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton(
+            "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+        )
+    )
+    kb.add(
+        types.InlineKeyboardButton("🔙 " + t(lang, "back_menu"), callback_data="menu")
+    )
     if edit:
-        bot.edit_message_text(text, edit.message.chat.id, edit.message.message_id, reply_markup=kb)
+        bot.edit_message_text(
+            text, edit.message.chat.id, edit.message.message_id, reply_markup=kb
+        )
     else:
         bot.send_message(chat_id, text, reply_markup=kb)
 
@@ -1322,7 +2059,12 @@ def send_paye_summary(chat_id, conn, case_id, lang, edit=None):
 def send_self_docs(chat_id, conn, case_id, lang, edit=None):
     text = t(lang, "self_docs") + "\n\n" + t(lang, "tax_note")
     if edit:
-        bot.edit_message_text(text, edit.message.chat.id, edit.message.message_id, reply_markup=upload_choice_kb(lang))
+        bot.edit_message_text(
+            text,
+            edit.message.chat.id,
+            edit.message.message_id,
+            reply_markup=upload_choice_kb(lang),
+        )
     else:
         bot.send_message(chat_id, text, reply_markup=upload_choice_kb(lang))
 
@@ -1330,7 +2072,12 @@ def send_self_docs(chat_id, conn, case_id, lang, edit=None):
 def send_company_docs(chat_id, conn, case_id, lang, edit=None):
     text = t(lang, "company_docs")
     if edit:
-        bot.edit_message_text(text, edit.message.chat.id, edit.message.message_id, reply_markup=upload_choice_kb(lang))
+        bot.edit_message_text(
+            text,
+            edit.message.chat.id,
+            edit.message.message_id,
+            reply_markup=upload_choice_kb(lang),
+        )
     else:
         bot.send_message(chat_id, text, reply_markup=upload_choice_kb(lang))
 
@@ -1340,7 +2087,9 @@ def show_doc_upload_menu(chat_id, conn, case, lang, edit=None):
     text = t(lang, "doc_upload_mode")
     kb = document_select_kb(lang, docs)
     if edit:
-        bot.edit_message_text(text, edit.message.chat.id, edit.message.message_id, reply_markup=kb)
+        bot.edit_message_text(
+            text, edit.message.chat.id, edit.message.message_id, reply_markup=kb
+        )
     else:
         bot.send_message(chat_id, text, reply_markup=kb)
 
@@ -1377,9 +2126,22 @@ def reminder_worker():
                 else:
                     text = t(lang, "reminder_payment")
                 kb = types.InlineKeyboardMarkup()
-                kb.add(types.InlineKeyboardButton("📄 " + t(lang, "upload_docs_btn"), callback_data="upload_now"))
-                kb.add(types.InlineKeyboardButton("📤 " + t(lang, "upload_payment_btn"), callback_data="upload_payment"))
-                kb.add(types.InlineKeyboardButton("📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"))
+                kb.add(
+                    types.InlineKeyboardButton(
+                        "📄 " + t(lang, "upload_docs_btn"), callback_data="upload_now"
+                    )
+                )
+                kb.add(
+                    types.InlineKeyboardButton(
+                        "📤 " + t(lang, "upload_payment_btn"),
+                        callback_data="upload_payment",
+                    )
+                )
+                kb.add(
+                    types.InlineKeyboardButton(
+                        "📞 " + t(lang, "talk_moderator"), callback_data="chat_ai"
+                    )
+                )
                 bot.send_message(case["tg_id"], text, reply_markup=kb)
                 db.mark_reminder_sent(conn, reminder["id"])
         time.sleep(60)
