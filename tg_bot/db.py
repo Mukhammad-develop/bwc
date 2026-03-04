@@ -144,6 +144,16 @@ def init_db(db_path: str) -> None:
             )
         """)
         conn.commit()
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN linked_account INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE pending_sends ADD COLUMN account_index INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
 
 def get_or_create_user(conn: sqlite3.Connection, tg_id: int) -> int:
@@ -176,6 +186,12 @@ def get_chat_mode(conn: sqlite3.Connection, tg_id: int) -> str:
 
 def set_chat_mode(conn: sqlite3.Connection, tg_id: int, mode: str) -> None:
     conn.execute("UPDATE users SET chat_mode = ? WHERE tg_id = ?", (mode, tg_id))
+    conn.commit()
+
+
+def set_user_linked_account(conn: sqlite3.Connection, tg_id: int, account_index: int) -> None:
+    """Record which Telegram account (0 or 1) this user last chatted with."""
+    conn.execute("UPDATE users SET linked_account = ? WHERE tg_id = ?", (account_index, tg_id))
     conn.commit()
 
 
@@ -256,17 +272,28 @@ def get_missing_docs(conn: sqlite3.Connection, case_id: int) -> List[str]:
         return []
 
 
-def queue_admin_send(conn: sqlite3.Connection, user_tg_id: str, message: str, sender_name: str = "Admin") -> None:
-    """Queue a message to be delivered to the user via the userbot."""
+def queue_admin_send(
+    conn: sqlite3.Connection,
+    user_tg_id: str,
+    message: str,
+    sender_name: str = "Admin",
+    account_index: int = 0,
+) -> None:
+    """Queue a message to be delivered via the userbot (account_index 0 or 1)."""
     conn.execute(
-        "INSERT INTO pending_sends (user_tg_id, message, sender_name, created_at) VALUES (?, ?, ?, ?)",
-        (str(user_tg_id), message, sender_name, _now_iso()),
+        "INSERT INTO pending_sends (user_tg_id, message, sender_name, account_index, created_at) VALUES (?, ?, ?, ?, ?)",
+        (str(user_tg_id), message, sender_name, account_index, _now_iso()),
     )
     conn.commit()
 
 
-def get_pending_sends(conn: sqlite3.Connection) -> List[sqlite3.Row]:
-    """Return all unsent queued messages."""
+def get_pending_sends(conn: sqlite3.Connection, account_index: Optional[int] = None) -> List[sqlite3.Row]:
+    """Return unsent queued messages, optionally for one account only."""
+    if account_index is not None:
+        return conn.execute(
+            "SELECT * FROM pending_sends WHERE sent = 0 AND account_index = ? ORDER BY id ASC",
+            (account_index,),
+        ).fetchall()
     return conn.execute(
         "SELECT * FROM pending_sends WHERE sent = 0 ORDER BY id ASC"
     ).fetchall()

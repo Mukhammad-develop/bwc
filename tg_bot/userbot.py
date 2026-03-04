@@ -1,14 +1,14 @@
 """
-Brightway Consulting — Telegram Userbot (personal account)
-Uses Telethon (MTProto) to connect a real Telegram account.
+Brightway Consulting — Telegram Userbot (up to 2 personal accounts)
+Uses Telethon to connect one or two real Telegram accounts.
 
-FIRST RUN (one-time authentication):
-    python userbot.py --auth
-  Telethon will ask for your phone number, then the OTP code sent by Telegram.
-  After that it saves a session file (userbot.session) and never asks again.
+FIRST RUN (one-time auth per account):
+    python userbot.py --auth   # account 1 → userbot.session
+    python userbot.py --auth2  # account 2 → userbot2.session
+  Set TG_PHONE and optionally TG_PHONE_2 in .env to auto-login.
 
 NORMAL RUN:
-    python userbot.py
+    python userbot.py   # runs both accounts; web UI unchanged.
 """
 
 import asyncio
@@ -46,14 +46,19 @@ DB_PATH     = _raw if _raw.startswith("/") else str(ROOT / "bot.db")
 API_ID      = int(os.getenv("TG_API_ID",   "30176806"))
 API_HASH    = os.getenv("TG_API_HASH",      "dade2446e3317ce1de17b0d0cf45ef4a")
 PHONE       = os.getenv("TG_PHONE",         "").strip()   # e.g. +998901234567
-
+PHONE_2     = os.getenv("TG_PHONE_2",       "").strip()   # second account (optional)
 SESSION     = str(ROOT / "userbot")
+SESSION_2   = str(ROOT / os.getenv("TG_SESSION_2", "userbot2"))
+
 UPLOADS_DIR = ROOT / "uploads"
 UPLOADS_DIR.mkdir(exist_ok=True)
 
 db.init_db(DB_PATH)
 
-client   = TelegramClient(SESSION, API_ID, API_HASH)
+# Two Telegram accounts: same handlers, replies go from the account that received the chat
+client1 = TelegramClient(SESSION, API_ID, API_HASH)
+client2 = TelegramClient(SESSION_2, API_ID, API_HASH)
+CLIENTS  = [client1, client2]
 executor = ThreadPoolExecutor(max_workers=4)
 
 
@@ -93,7 +98,7 @@ async def safe_typing(event):
     """
     try:
         peer = await event.get_input_chat()
-        return client.action(peer, "typing")
+        return event.client.action(peer, "typing")
     except Exception:
         return _NullContext()
 
@@ -113,190 +118,165 @@ async def safe_send(event, text, **kwargs):
         await event.respond(text, **kwargs)
 
 
-# ── /start handler ────────────────────────────────────────────────────────────
+# ── Register handlers for one client (account_index 0 or 1) ───────────────────
 
-@client.on(events.NewMessage(pattern=r"^/start$", incoming=True, func=lambda e: e.is_private))
-async def handle_start(event):
-    tg_id = event.sender_id
-    with db.connect(DB_PATH) as conn:
-        db.get_or_create_user(conn, tg_id)
-        lang = db.get_language(conn, tg_id)
-    await safe_send(event, t(lang, "welcome"), buttons=lang_buttons())
+def register_handlers(client, account_index: int):
+    """Attach all message handlers to this client; user is linked to this account."""
 
-
-# ── /help handler ─────────────────────────────────────────────────────────────
-
-@client.on(events.NewMessage(pattern=r"^/help$", incoming=True, func=lambda e: e.is_private))
-async def handle_help(event):
-    tg_id = event.sender_id
-    async with await safe_typing(event):
+    @client.on(events.NewMessage(pattern=r"^/start$", incoming=True, func=lambda e: e.is_private))
+    async def handle_start(event):
+        tg_id = event.sender_id
         with db.connect(DB_PATH) as conn:
             db.get_or_create_user(conn, tg_id)
+            db.set_user_linked_account(conn, tg_id, account_index)
             lang = db.get_language(conn, tg_id)
-    await safe_send(event, t(lang, "help_text"))
+        await safe_send(event, t(lang, "welcome"), buttons=lang_buttons())
 
+    @client.on(events.NewMessage(pattern=r"^/help$", incoming=True, func=lambda e: e.is_private))
+    async def handle_help(event):
+        tg_id = event.sender_id
+        async with await safe_typing(event):
+            with db.connect(DB_PATH) as conn:
+                db.get_or_create_user(conn, tg_id)
+                db.set_user_linked_account(conn, tg_id, account_index)
+                lang = db.get_language(conn, tg_id)
+        await safe_send(event, t(lang, "help_text"))
 
-# ── /mycase handler ────────────────────────────────────────────────────────────
-
-@client.on(events.NewMessage(pattern=r"^/(mycase|case)$", incoming=True, func=lambda e: e.is_private))
-async def handle_mycase(event):
-    tg_id = event.sender_id
-    async with await safe_typing(event):
-        with db.connect(DB_PATH) as conn:
-            user_id   = db.get_or_create_user(conn, tg_id)
-            lang      = db.get_language(conn, tg_id)
-            case      = db.get_active_case(conn, user_id)
-            doc_count = len(db.list_documents(conn, case["id"])) if case else 0
-    if not case or not case["service"]:
-        await safe_send(event, t(lang, "case_none"))
-        return
-    await safe_send(
-        event,
-        t(lang, "case_info",
-          service=case["service"],
-          status=case["status"],
-          payment=case["payment_status"],
-          doc_count=doc_count),
-    )
-
-
-# ── Inline keyboard callback (language selection) ─────────────────────────────
-
-@client.on(events.CallbackQuery(func=lambda e: e.is_private))
-async def handle_callback(event):
-    data = event.data.decode("utf-8")
-    tg_id = event.sender_id
-
-    if data.startswith("lang_"):
-        lang_code = data.split("_")[1]
-        with db.connect(DB_PATH) as conn:
-            db.get_or_create_user(conn, tg_id)
-            db.set_language(conn, tg_id, lang_code)
-        # Replace the language-selection message with the intro text (no buttons)
-        try:
-            await event.edit(t(lang_code, "intro"), buttons=None)
-        except Exception:
-            await safe_send(event, t(lang_code, "intro"))
-
-    await event.answer()
-
-
-# ── Text message handler ──────────────────────────────────────────────────────
-
-@client.on(events.NewMessage(
-    incoming=True,
-    func=lambda e: e.is_private and not e.message.media and not (e.message.text or "").startswith("/")
-))
-async def handle_text(event):
-    tg_id = event.sender_id
-    text  = (event.message.text or "").strip()
-    if not text:
-        return
-
-    lang = "en"
-    case = None
-    async with await safe_typing(event):
-        with db.connect(DB_PATH) as conn:
-            user_id  = db.get_or_create_user(conn, tg_id)
-            lang     = db.get_language(conn, tg_id)
-            case     = db.get_active_case(conn, user_id)
-            detected = detect_service(text)
-            service  = detected or (case["service"] if case and case["service"] else "general")
-            case     = _get_or_open_case(conn, user_id, service)
-
-            db.add_conversation_message(conn, case["id"], "user", text)
-            conversation = db.get_conversation(conn, case["id"])
-
-        reply = await asyncio.get_event_loop().run_in_executor(
-            executor, ask_ai, conversation, case["service"], lang
+    @client.on(events.NewMessage(pattern=r"^/(mycase|case)$", incoming=True, func=lambda e: e.is_private))
+    async def handle_mycase(event):
+        tg_id = event.sender_id
+        async with await safe_typing(event):
+            with db.connect(DB_PATH) as conn:
+                user_id   = db.get_or_create_user(conn, tg_id)
+                db.set_user_linked_account(conn, tg_id, account_index)
+                lang      = db.get_language(conn, tg_id)
+                case      = db.get_active_case(conn, user_id)
+                doc_count = len(db.list_documents(conn, case["id"])) if case else 0
+        if not case or not case["service"]:
+            await safe_send(event, t(lang, "case_none"))
+            return
+        await safe_send(
+            event,
+            t(lang, "case_info",
+              service=case["service"],
+              status=case["status"],
+              payment=case["payment_status"],
+              doc_count=doc_count),
         )
 
-    with db.connect(DB_PATH) as conn:
-        if reply:
-            db.add_conversation_message(conn, case["id"], "assistant", reply)
-            await safe_send(event, reply)
-        else:
-            await safe_send(event, t(lang, "ai_error"))
+    @client.on(events.CallbackQuery(func=lambda e: e.is_private))
+    async def handle_callback(event):
+        data = event.data.decode("utf-8")
+        tg_id = event.sender_id
+        if data.startswith("lang_"):
+            lang_code = data.split("_")[1]
+            with db.connect(DB_PATH) as conn:
+                db.get_or_create_user(conn, tg_id)
+                db.set_user_linked_account(conn, tg_id, account_index)
+                db.set_language(conn, tg_id, lang_code)
+            try:
+                await event.edit(t(lang_code, "intro"), buttons=None)
+            except Exception:
+                await safe_send(event, t(lang_code, "intro"))
+        await event.answer()
 
-
-# ── Document / photo handler ──────────────────────────────────────────────────
-
-@client.on(events.NewMessage(
-    incoming=True,
-    func=lambda e: e.is_private and bool(e.message.media)
-))
-async def handle_media(event):
-    tg_id = event.sender_id
-    msg   = event.message
-
-    # Determine filename, media type, a unique ID
-    if isinstance(msg.media, MessageMediaPhoto):
-        unique_id  = str(uuid.uuid4())
-        filename   = f"{unique_id}.jpg"
-        media_type = "photo"
-    elif isinstance(msg.media, MessageMediaDocument):
-        doc = msg.media.document
-        unique_id  = str(uuid.uuid4())
-        # Try to get the original filename from attributes
-        base_name = None
-        for attr in doc.attributes:
-            if isinstance(attr, DocumentAttributeFilename):
-                base_name = attr.file_name
-                break
-        if not base_name:
-            ext = mimetypes.guess_extension(doc.mime_type or "") or ""
-            base_name = f"document{ext}"
-        # Use unique filename so multiple voice/docs never overwrite the same file
-        ext = (Path(base_name).suffix or "").lower() or ".oga"
-        filename = f"{unique_id}{ext}"
-        media_type = "document"
-    else:
-        # Voice, video notes, stickers etc — ignore silently
-        return
-
-    lang = "en"
-    case = None
-    async with await safe_typing(event):
-        # Download file to uploads dir
-        dest_path = UPLOADS_DIR / filename
-        try:
-            await msg.download_media(file=str(dest_path))
-        except Exception as e:
-            print(f"[Userbot] download error: {e}")
-            filename  = f"file_{unique_id}"
-            dest_path = UPLOADS_DIR / filename
-
-        file_id  = f"local:{filename}"
-        file_uid = unique_id
-
-        with db.connect(DB_PATH) as conn:
-            user_id  = db.get_or_create_user(conn, tg_id)
-            lang     = db.get_language(conn, tg_id)
-            case     = db.get_active_case(conn, user_id)
-            if not case or not case["service"]:
-                case = _get_or_open_case(conn, user_id, "general")
-
-            db.add_document(conn, case["id"], filename, file_id, file_uid,
-                            filename=filename, media_type=media_type)
-            db.add_conversation_message(
-                conn, case["id"], "user",
-                f"[FILE:{file_uid}:{filename}:{media_type}]",
+    @client.on(events.NewMessage(
+        incoming=True,
+        func=lambda e: e.is_private and not e.message.media and not (e.message.text or "").startswith("/")
+    ))
+    async def handle_text(event):
+        tg_id = event.sender_id
+        text  = (event.message.text or "").strip()
+        if not text:
+            return
+        lang = "en"
+        case = None
+        async with await safe_typing(event):
+            with db.connect(DB_PATH) as conn:
+                user_id  = db.get_or_create_user(conn, tg_id)
+                db.set_user_linked_account(conn, tg_id, account_index)
+                lang     = db.get_language(conn, tg_id)
+                case     = db.get_active_case(conn, user_id)
+                detected = detect_service(text)
+                service  = detected or (case["service"] if case and case["service"] else "general")
+                case     = _get_or_open_case(conn, user_id, service)
+                db.add_conversation_message(conn, case["id"], "user", text)
+                conversation = db.get_conversation(conn, case["id"])
+            reply = await asyncio.get_event_loop().run_in_executor(
+                executor, ask_ai, conversation, case["service"], lang
             )
-            conversation = db.get_conversation(conn, case["id"])
+        with db.connect(DB_PATH) as conn:
+            if reply:
+                db.add_conversation_message(conn, case["id"], "assistant", reply)
+                await safe_send(event, reply)
+            else:
+                await safe_send(event, t(lang, "ai_error"))
 
-        reply = await asyncio.get_event_loop().run_in_executor(
-            executor, ask_ai, conversation, case["service"], lang
-        )
-
-    with db.connect(DB_PATH) as conn:
-        if reply:
-            db.add_conversation_message(conn, case["id"], "assistant", reply)
-            await safe_send(event, reply)
+    @client.on(events.NewMessage(
+        incoming=True,
+        func=lambda e: e.is_private and bool(e.message.media)
+    ))
+    async def handle_media(event):
+        tg_id = event.sender_id
+        msg   = event.message
+        if isinstance(msg.media, MessageMediaPhoto):
+            unique_id  = str(uuid.uuid4())
+            filename   = f"{unique_id}.jpg"
+            media_type = "photo"
+        elif isinstance(msg.media, MessageMediaDocument):
+            doc = msg.media.document
+            unique_id  = str(uuid.uuid4())
+            base_name = None
+            for attr in doc.attributes:
+                if isinstance(attr, DocumentAttributeFilename):
+                    base_name = attr.file_name
+                    break
+            if not base_name:
+                ext = mimetypes.guess_extension(doc.mime_type or "") or ""
+                base_name = f"document{ext}"
+            ext = (Path(base_name).suffix or "").lower() or ".oga"
+            filename = f"{unique_id}{ext}"
+            media_type = "document"
         else:
-            await safe_send(event, t(lang, "doc_received"))
+            return
+        lang = "en"
+        case = None
+        async with await safe_typing(event):
+            dest_path = UPLOADS_DIR / filename
+            try:
+                await msg.download_media(file=str(dest_path))
+            except Exception as e:
+                print(f"[Userbot] download error: {e}")
+                filename  = f"file_{unique_id}"
+                dest_path = UPLOADS_DIR / filename
+            file_id  = f"local:{filename}"
+            file_uid = unique_id
+            with db.connect(DB_PATH) as conn:
+                user_id  = db.get_or_create_user(conn, tg_id)
+                db.set_user_linked_account(conn, tg_id, account_index)
+                lang     = db.get_language(conn, tg_id)
+                case     = db.get_active_case(conn, user_id)
+                if not case or not case["service"]:
+                    case = _get_or_open_case(conn, user_id, "general")
+                db.add_document(conn, case["id"], filename, file_id, file_uid,
+                                filename=filename, media_type=media_type)
+                db.add_conversation_message(
+                    conn, case["id"], "user",
+                    f"[FILE:{file_uid}:{filename}:{media_type}]",
+                )
+                conversation = db.get_conversation(conn, case["id"])
+            reply = await asyncio.get_event_loop().run_in_executor(
+                executor, ask_ai, conversation, case["service"], lang
+            )
+        with db.connect(DB_PATH) as conn:
+            if reply:
+                db.add_conversation_message(conn, case["id"], "assistant", reply)
+                await safe_send(event, reply)
+            else:
+                await safe_send(event, t(lang, "doc_received"))
 
 
-# ── Chat import loop ─────────────────────────────────────────────────────────
+# ── Chat import loop (uses first account) ─────────────────────────────────────
 
 async def process_import(req_id: int, user_tg_id: str):
     """
@@ -310,8 +290,7 @@ async def process_import(req_id: int, user_tg_id: str):
         peer = user_tg_id  # username string
 
     try:
-        # Fetch up to 3000 messages (Telethon pages automatically)
-        raw_msgs = await client.get_messages(peer, limit=3000)
+        raw_msgs = await CLIENTS[0].get_messages(peer, limit=3000)
     except Exception as e:
         with db.connect(DB_PATH) as conn:
             db.update_import_status(conn, req_id, "error", error_msg=str(e))
@@ -364,30 +343,26 @@ async def import_queue_loop():
             print(f"[Userbot] import_queue_loop error: {e}")
 
 
-# ── Admin → user send-queue loop ─────────────────────────────────────────────
+# ── Admin → user send-queue loop (per-account) ────────────────────────────────
 
 async def send_queue_loop():
-    """
-    Poll the pending_sends table every 3 seconds and deliver any queued
-    messages to users via the personal Telegram account (this userbot).
-    Messages arrive from the admin panel and must be sent as the real user,
-    not as the bot.
-    """
-    print("[Userbot] send_queue_loop started")
+    """Poll pending_sends and send via the correct account (0 or 1)."""
+    print("[Userbot] send_queue_loop started (2 accounts)")
     while True:
         await asyncio.sleep(3)
         try:
-            with db.connect(DB_PATH) as conn:
-                rows = db.get_pending_sends(conn)
-            for row in rows:
-                try:
-                    tg_id = int(row["user_tg_id"])
-                    await client.send_message(tg_id, row["message"])
-                    with db.connect(DB_PATH) as conn:
-                        db.mark_send_done(conn, row["id"])
-                    print(f"[Userbot] queued msg sent → {tg_id}")
-                except Exception as e:
-                    print(f"[Userbot] send_queue error for {row['user_tg_id']}: {e}")
+            for account_index, c in enumerate(CLIENTS):
+                with db.connect(DB_PATH) as conn:
+                    rows = db.get_pending_sends(conn, account_index=account_index)
+                for row in rows:
+                    try:
+                        tg_id = int(row["user_tg_id"])
+                        await c.send_message(tg_id, row["message"])
+                        with db.connect(DB_PATH) as conn:
+                            db.mark_send_done(conn, row["id"])
+                        print(f"[Userbot] account {account_index} → {tg_id}")
+                    except Exception as e:
+                        print(f"[Userbot] send_queue error account {account_index} {row['user_tg_id']}: {e}")
         except Exception as e:
             print(f"[Userbot] send_queue_loop error: {e}")
 
@@ -399,29 +374,42 @@ async def main():
         print("[Userbot] ERROR: TG_API_ID / TG_API_HASH not set in .env")
         return
 
+    # First-time auth: one account at a time
     if "--auth" in sys.argv:
-        print("[Userbot] Starting first-time authentication...")
-        print("  You will be asked for your phone number and OTP code.")
-        await client.start()
-        me = await client.get_me()
-        print(f"[Userbot] Authenticated as @{me.username} ({me.first_name})")
-        print(f"[Userbot] Session saved to: {SESSION}.session")
-        print("[Userbot] Run without --auth to start normally.")
+        print("[Userbot] Auth account 1…")
+        await client1.start()
+        me = await client1.get_me()
+        print(f"[Userbot] Account 1: @{me.username} ({me.first_name})")
+        print("[Userbot] Run without --auth to start.")
+        return
+    if "--auth2" in sys.argv:
+        print("[Userbot] Auth account 2…")
+        await client2.start()
+        me = await client2.get_me()
+        print(f"[Userbot] Account 2: @{me.username} ({me.first_name})")
+        print("[Userbot] Run without --auth2 to start.")
         return
 
+    # Start both accounts
     if PHONE:
-        await client.start(phone=PHONE)
+        await client1.start(phone=PHONE)
     else:
-        await client.start()
+        await client1.start()
+    if PHONE_2:
+        await client2.start(phone=PHONE_2)
+    else:
+        await client2.start()
 
-    me = await client.get_me()
-    print(f"[Userbot] Running as @{me.username} ({me.first_name})")
+    me1 = await client1.get_me()
+    me2 = await client2.get_me()
+    print(f"[Userbot] Account 1: @{me1.username} | Account 2: @{me2.username}")
     print(f"[Userbot] DB: {DB_PATH}")
-    print("[Userbot] Listening for messages…")
+    register_handlers(client1, 0)
+    register_handlers(client2, 1)
 
-    # Run all background loops concurrently alongside the client
     await asyncio.gather(
-        client.run_until_disconnected(),
+        client1.run_until_disconnected(),
+        client2.run_until_disconnected(),
         send_queue_loop(),
         import_queue_loop(),
     )

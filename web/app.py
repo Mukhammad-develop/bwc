@@ -130,6 +130,16 @@ def init_admin_tables():
             conn.commit()
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN linked_account INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE pending_sends ADD COLUMN account_index INTEGER DEFAULT 0")
+            conn.commit()
+        except sqlite3.OperationalError:
+            pass
 
 
 init_admin_tables()
@@ -1229,15 +1239,18 @@ def admin_send_message(user_db_id):
     admin_name = session.get("admin_display") or session.get("admin_username", "Admin")
 
     with get_db() as conn:
-        user = conn.execute("SELECT * FROM users WHERE id=?", (user_db_id,)).fetchone()
+        user = conn.execute("SELECT tg_id, linked_account FROM users WHERE id=?", (user_db_id,)).fetchone()
         if not user:
             return jsonify({"error": "User not found"}), 404
+        user_d = dict(user)
+        account_index = user_d.get("linked_account", 0) or 0
+        account_index = 0 if account_index not in (0, 1) else account_index
 
-        # Queue delivery via userbot (personal account)
+        # Queue delivery via userbot (which account: 0 or 1, from user's last chat)
         conn.execute(
-            """INSERT INTO pending_sends (user_tg_id, message, sender_name, sent, created_at)
-               VALUES (?, ?, ?, 0, ?)""",
-            (str(user["tg_id"]), text, admin_name, ts),
+            """INSERT INTO pending_sends (user_tg_id, message, sender_name, sent, account_index, created_at)
+               VALUES (?, ?, ?, 0, ?, ?)""",
+            (str(user_d["tg_id"]), text, admin_name, account_index, ts),
         )
 
         # Save to the most recent case's conversation history
