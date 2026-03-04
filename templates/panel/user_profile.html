@@ -22,7 +22,7 @@
 
     <div class="profile-card">
       <div class="profile-avatar" style="font-size:1.25rem;letter-spacing:0">
-        {{ profile.full_name|default:user.tg_id|first|upper }}
+        {% if profile.full_name %}{{ profile.full_name|first|upper }}{% else %}{{ user.tg_id|stringformat:"s"|first|upper }}{% endif %}
       </div>
       <div class="profile-name">{{ profile.full_name|default:"Unknown User" }}</div>
       <div class="profile-sub">Telegram ID: @{{ user.tg_id }}</div>
@@ -137,7 +137,10 @@
           <span id="liveNewBadge" class="chat-new-badge" style="display:none">New message ↓</span>
         </div>
 
-        <div class="chat-messages" id="unifiedChat">
+        <div class="chat-messages" id="unifiedChat"
+             data-user-id="{{ user.id }}"
+             data-poll-url="{% url 'panel:poll_messages' user.id %}"
+             data-send-url="{% url 'panel:send_message' user.id %}">
           {% for case in cases %}
           {% with conv=case.conversation_history|fromjson %}
           {% for msg in conv %}
@@ -289,9 +292,10 @@
 
 {% block extra_js %}
 <script>
-const USER_ID  = {{ user.id }};
-const POLL_URL = '{% url "panel:poll_messages" user.id %}';
-const SEND_URL = '{% url "panel:send_message" user.id %}';
+const _chat   = document.getElementById('unifiedChat');
+const USER_ID  = parseInt(_chat.dataset.userId, 10);
+const POLL_URL = _chat.dataset.pollUrl;
+const SEND_URL = _chat.dataset.sendUrl;
 
 let lastTs = '';
 let pollTimer = null;

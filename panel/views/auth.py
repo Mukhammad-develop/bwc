@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.contrib import messages
 from django.views.decorators.http import require_http_methods
 
-from panel.decorators import login_required
+from panel.decorators import login_required, _get_admin
 from .helpers import (
     check_admin_login, hash_password, check_password,
     notify_masters, session_ctx, get_current_admin,
@@ -13,8 +13,11 @@ from core.models import AdminUser
 
 @require_http_methods(["GET", "POST"])
 def login_view(request):
-    if request.session.get("admin_logged_in"):
+    admin = _get_admin(request)
+    if request.session.get("admin_logged_in") and admin:
         return redirect(reverse("panel:dashboard"))
+    if request.session.get("admin_logged_in") and not admin:
+        request.session.flush()  # stale session, e.g. admin deleted
     error = None
     if request.method == "POST":
         username = request.POST.get("username", "").strip()

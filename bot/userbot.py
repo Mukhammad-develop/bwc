@@ -56,9 +56,10 @@ SESSION_2 = str(SESSIONS_DIR / "userbot2")
 UPLOADS_DIR = settings.UPLOADS_DIR
 UPLOADS_DIR.mkdir(exist_ok=True)
 
-client1 = TelegramClient(SESSION,   API_ID, API_HASH)
-client2 = TelegramClient(SESSION_2, API_ID, API_HASH)
-CLIENTS = [client1, client2]
+client1 = TelegramClient(SESSION, API_ID, API_HASH)
+client2 = TelegramClient(SESSION_2, API_ID, API_HASH) if PHONE_2 else None
+CLIENTS = [client1, client2] if client2 else [client1]
+ACTIVE_CLIENTS = CLIENTS  # populated in main() after connect
 
 executor = ThreadPoolExecutor(max_workers=4)
 
@@ -259,10 +260,14 @@ async def process_import(req_id: int, user_tg_id: str):
     except ValueError:
         peer = user_tg_id
 
+    loop = asyncio.get_event_loop()
     try:
         raw_msgs = await CLIENTS[0].get_messages(peer, limit=3000)
     except Exception as e:
-        ImportRequest.objects.filter(pk=req_id).update(status="error", error_msg=str(e))
+        await loop.run_in_executor(
+            executor,
+            lambda: ImportRequest.objects.filter(pk=req_id).update(status="error", error_msg=str(e)),
+        )
         return
 
     raw_msgs = list(reversed(raw_msgs))
@@ -290,12 +295,18 @@ async def process_import(req_id: int, user_tg_id: str):
 
 async def import_queue_loop():
     print("[Userbot] import_queue_loop started")
+    loop = asyncio.get_event_loop()
     while True:
         await asyncio.sleep(5)
         try:
-            pending = list(ImportRequest.objects.filter(status="pending"))
+            pending = await loop.run_in_executor(
+                executor, lambda: list(ImportRequest.objects.filter(status="pending"))
+            )
             for req in pending:
-                ImportRequest.objects.filter(pk=req.pk).update(status="processing")
+                await loop.run_in_executor(
+                    executor,
+                    lambda pk=req.pk: ImportRequest.objects.filter(pk=pk).update(status="processing"),
+                )
                 await process_import(req.pk, req.user_tg_id)
         except Exception as e:
             print(f"[Userbot] import_queue_loop error: {e}")
@@ -305,17 +316,27 @@ async def import_queue_loop():
 
 async def send_queue_loop():
     print("[Userbot] send_queue_loop started")
+    loop = asyncio.get_event_loop()
     while True:
         await asyncio.sleep(3)
         try:
-            for account_index, client in enumerate(CLIENTS):
-                rows = list(PendingSend.objects.filter(sent=False, account_index=account_index))
+            for account_index, client in enumerate(ACTIVE_CLIENTS):
+                rows = await loop.run_in_executor(
+                    executor,
+                    lambda ai=account_index: list(
+                        PendingSend.objects.filter(sent=False, account_index=ai)
+                    ),
+                )
                 for row in rows:
                     try:
                         await client.send_message(int(row.user_tg_id), row.message)
-                        row.sent    = True
-                        row.sent_at = timezone.now()
-                        row.save(update_fields=["sent", "sent_at"])
+
+                        def _mark_sent(r=row):
+                            r.sent    = True
+                            r.sent_at = timezone.now()
+                            r.save(update_fields=["sent", "sent_at"])
+
+                        await loop.run_in_executor(executor, _mark_sent)
                         print(f"[Userbot] account {account_index} → {row.user_tg_id}")
                     except Exception as e:
                         print(f"[Userbot] send error account {account_index} {row.user_tg_id}: {e}")
@@ -342,30 +363,33 @@ async def main():
         print("[Userbot] Account 2 authenticated. Session saved.")
         return
 
+    global ACTIVE_CLIENTS
+
     register_handlers(client1, account_index=0)
-    register_handlers(client2, account_index=1)
-
-    await client1.start()
-    try:
-        await client2.start()
-        has_client2 = True
-    except Exception as e:
-        print(f"[Userbot] Account 2 unavailable: {e}")
-        has_client2 = False
-
+    await client1.start(phone=PHONE or None)
     me1 = await client1.get_me()
     print(f"[Userbot] Account 1: @{me1.username or me1.id}")
-    if has_client2:
-        me2 = await client2.get_me()
-        print(f"[Userbot] Account 2: @{me2.username or me2.id}")
+    ACTIVE_CLIENTS = [client1]
+
+    if client2 and PHONE_2:
+        try:
+            register_handlers(client2, account_index=1)
+            await client2.start(phone=PHONE_2)
+            me2 = await client2.get_me()
+            print(f"[Userbot] Account 2: @{me2.username or me2.id}")
+            ACTIVE_CLIENTS.append(client2)
+        except Exception as e:
+            print(f"[Userbot] Account 2 unavailable: {e}")
+    else:
+        print("[Userbot] Account 2 not configured (TG_PHONE_2 not set) — skipping.")
 
     tasks = [
         asyncio.create_task(client1.run_until_disconnected()),
         asyncio.create_task(send_queue_loop()),
         asyncio.create_task(import_queue_loop()),
     ]
-    if has_client2:
-        tasks.append(asyncio.create_task(client2.run_until_disconnected()))
+    for c in ACTIVE_CLIENTS[1:]:
+        tasks.append(asyncio.create_task(c.run_until_disconnected()))
 
     await asyncio.gather(*tasks)
 

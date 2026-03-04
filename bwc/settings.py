@@ -62,6 +62,9 @@ MEDIA_ROOT = BASE_DIR / "uploads"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+USE_I18N = True
+USE_TZ = False  # keep naive datetimes consistent with existing bot data
+
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 SESSION_COOKIE_AGE = 86400 * 30  # 30 days
 
