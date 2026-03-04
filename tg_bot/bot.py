@@ -2,7 +2,7 @@ import telebot
 from telebot import types
 
 import db
-from config import BOT_TOKEN, DB_PATH
+from config import BOT_TOKEN, DB_PATH, OPENAI_API_KEY
 from services import t, detect_service, ask_ai, build_system_prompt  # noqa: F401 (build_system_prompt kept for potential direct use)
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
