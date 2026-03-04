@@ -67,7 +67,7 @@
           <div class="bar-row">
             <div class="bar-label">{{ s.service|title }}</div>
             <div class="bar-track">
-              <div class="bar-fill fill-{{ s.service }}" style="width:{{ s.cnt }}0%"></div>
+              <div class="bar-fill fill-default fill-{{ s.service }}" data-pct="{{ s.cnt }}"></div>
             </div>
             <div class="bar-count">{{ s.cnt }}</div>
           </div>
@@ -107,4 +107,12 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelectorAll('.bar-fill[data-pct]').forEach(function(el) {
+    el.style.width = (parseInt(el.dataset.pct, 10) * 10) + '%';
+  });
+</script>
 {% endblock %}
