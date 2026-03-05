@@ -379,19 +379,29 @@ Always move the conversation forward naturally."""
 
 
 def build_system_prompt(service: str, lang: str) -> str:
-    if service == "general" or service not in SERVICE_INFO:
-        return GENERAL_SYSTEM_PROMPT
-
-    info = SERVICE_INFO[service]
     lang_map = {
         "en": "English",
         "uz": "Uzbek (Latin script, not Cyrillic)",
         "ru": "Russian",
     }
     reply_lang = lang_map.get(lang, "English")
+    lang_suffix = f"\n\nLANGUAGE: Reply ONLY in {reply_lang}. Never switch languages even if the user writes in a different one.\nKeep each message short and focused — one question, one instruction, or one confirmation at a time."
 
-    if "flow" in info:
-        return f"""You work at Brightway Consulting, a UK firm helping Central Asian workers in England.
+    # Try DB-defined prompt first (allows live editing from admin panel)
+    if service and service != "general":
+        try:
+            from core.models import ServiceDefinition
+            sdef = ServiceDefinition.objects.get(slug=service, is_active=True)
+            if sdef.ai_prompt.strip():
+                return sdef.ai_prompt.strip() + lang_suffix
+        except Exception:
+            pass
+
+    # Fallback to hardcoded SERVICE_INFO for backwards compat
+    if service != "general" and service in SERVICE_INFO:
+        info = SERVICE_INFO[service]
+        if "flow" in info:
+            return f"""You work at Brightway Consulting, a UK firm helping Central Asian workers in England.
 You're in a Telegram chat helping the client with: {info['name']}.
 
 {info['flow']}
@@ -402,7 +412,7 @@ You're in a Telegram chat helping the client with: {info['name']}.
 LANGUAGE: Reply ONLY in {reply_lang}. Never switch languages even if the user writes in a different one.
 Keep each message short and focused — one question, one instruction, or one confirmation at a time."""
 
-    return f"""You work at Brightway Consulting, a UK firm. You're chatting with a client on Telegram about {info['name']}.
+        return f"""You work at Brightway Consulting, a UK firm. You're chatting with a client on Telegram about {info['name']}.
 
 YOUR JOB — gather this info through natural conversation, one thing at a time:
 {chr(10).join(f"- {item}" for item in info['collect'])}
@@ -423,6 +433,8 @@ KEY FACTS:
 {STYLE_EXAMPLES}
 Reply in {reply_lang}. Keep messages to 1-3 short sentences unless listing documents.
 Use varied sentence structures so replies do not sound repetitive."""
+
+    return GENERAL_SYSTEM_PROMPT
 
 
 # ─────────────────────────── AI CALLER ───────────────────────────────────────

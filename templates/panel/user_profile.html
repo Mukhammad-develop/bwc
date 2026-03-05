@@ -119,12 +119,77 @@
     </div>
     {% endif %}
 
+    <!-- ── Client Notes ─────────────────────────────── -->
+    <div class="card" id="notes">
+      <div class="card-header">
+        <span>Client Notes ({{ notes|length }})</span>
+        <button type="button" class="btn btn-sm btn-primary" onclick="toggleNoteForm()">+ Add Note</button>
+      </div>
+
+      <div id="noteFormWrap" style="display:none;padding:1rem 1.25rem 0">
+        <form method="POST" action="{% url 'panel:note_add' user.id %}">
+          {% csrf_token %}
+          <textarea name="body" class="form-input" rows="4"
+                    placeholder="Write a note about this client (e.g. called on 17 Feb, discussed docs)…"
+                    required style="width:100%;margin-bottom:.6rem"></textarea>
+          <div style="display:flex;gap:.5rem">
+            <button type="submit" class="btn btn-primary btn-sm">Save Note</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="toggleNoteForm()">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      {% if not notes %}
+      <div style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:.85rem">No notes yet.</div>
+      {% else %}
+      <div style="display:flex;flex-direction:column;gap:0">
+        {% for note in notes %}
+        <div class="note-card" id="note-{{ note.id }}">
+          <div class="note-header">
+            <div class="note-avatar">{{ note.author.display_name|default:note.author.username|first|upper|default:"?" }}</div>
+            <div>
+              <span class="note-author">{{ note.author.display_name|default:note.author.username|default:"Deleted user" }}</span>
+              <span class="role-badge {% if note.author.role == 'master' %}master{% elif note.author.role == 'admin' %}admin{% else %}consultant{% endif %}" style="font-size:.65rem;padding:1px 6px">
+                {{ note.author.role|default:"" }}
+              </span>
+            </div>
+            <div class="note-time">{{ note.created_at|date:"d M Y H:i" }}</div>
+            {% if note.author_id == current_admin_id or current_admin_role in "master,admin" %}
+            <div class="note-actions">
+              <button class="btn btn-xs btn-ghost" onclick="editNote({{ note.id }})">Edit</button>
+              <form method="POST" action="{% url 'panel:note_delete' user.id note.id %}" style="display:inline"
+                    onsubmit="return confirm('Delete this note?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-xs btn-danger">Del</button>
+              </form>
+            </div>
+            {% endif %}
+          </div>
+          <div class="note-body" id="note-body-{{ note.id }}" style="white-space:pre-wrap">{{ note.body }}</div>
+          <div class="note-edit-form" id="note-edit-{{ note.id }}" style="display:none;margin-top:.5rem">
+            <form method="POST" action="{% url 'panel:note_edit' user.id note.id %}">
+              {% csrf_token %}
+              <textarea name="body" class="form-input" rows="4" required
+                        style="width:100%;margin-bottom:.5rem">{{ note.body }}</textarea>
+              <div style="display:flex;gap:.4rem">
+                <button type="submit" class="btn btn-primary btn-sm">Update</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="cancelEditNote({{ note.id }})">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
   </div>
 
   <!-- Right column: tabs -->
   <div>
     <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('tab-chats', this)">Chat History ({{ cases|length }})</button>
+      <button class="tab-btn" onclick="switchTab('tab-progress', this)">Progress</button>
       <button class="tab-btn" onclick="switchTab('tab-files', this)">Files ({{ docs_for_files|length }})</button>
     </div>
 
@@ -236,6 +301,34 @@
           </button>
         </div>
       </div>
+    </div>
+
+    <!-- Progress tab -->
+    <div class="tab-pane" id="tab-progress">
+      {% for case in cases %}
+      {% with pdata=case_progress_data|get_item:case.id %}
+      {% if pdata and pdata.steps %}
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">
+          <span>{{ case.service|title }} — Case #{{ case.id }}</span>
+          <span class="badge {% if case.status == 'active' %}badge-blue{% elif case.status == 'completed' %}badge-green{% else %}badge-grey{% endif %}">{{ case.status }}</span>
+        </div>
+        <div style="padding:1.5rem 1rem">
+          {% include "panel/_progress_bar.html" with steps=pdata.steps current_idx=pdata.current_idx current_step_id=pdata.current_step_id case=case %}
+        </div>
+      </div>
+      {% else %}
+      <div class="card" style="margin-bottom:1rem">
+        <div class="card-header">
+          <span>{{ case.service|title }} — Case #{{ case.id }}</span>
+        </div>
+        <div style="padding:1rem;color:var(--text-muted);font-size:.85rem">No progress steps defined for this service. <a href="{% url 'panel:services_list' %}">Configure in Services →</a></div>
+      </div>
+      {% endif %}
+      {% endwith %}
+      {% empty %}
+      <div style="padding:2rem;text-align:center;color:var(--text-muted)">No cases for this user.</div>
+      {% endfor %}
     </div>
 
     <!-- Files tab -->
@@ -496,6 +589,21 @@ function scrollToBottom(force = false) {
   const chat = document.getElementById('unifiedChat');
   if (!chat) return;
   if (force || !userScrolledUp) chat.scrollTop = chat.scrollHeight;
+}
+
+// ── Notes ───────────────────────────────────────────
+function toggleNoteForm() {
+  const w = document.getElementById('noteFormWrap');
+  w.style.display = w.style.display === 'none' ? 'block' : 'none';
+  if (w.style.display === 'block') w.querySelector('textarea').focus();
+}
+function editNote(id) {
+  document.getElementById('note-body-' + id).style.display = 'none';
+  document.getElementById('note-edit-' + id).style.display = 'block';
+}
+function cancelEditNote(id) {
+  document.getElementById('note-body-' + id).style.display = '';
+  document.getElementById('note-edit-' + id).style.display = 'none';
 }
 </script>
 {% endblock %}

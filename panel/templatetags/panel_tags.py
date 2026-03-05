@@ -79,3 +79,9 @@ def replace(value, arg):
         return value
     old, new = arg.split(",", 1)
     return str(value).replace(old, new)
+
+
+@register.filter
+def tojson(value):
+    """Safe JSON encoding for use in JS: {{ value|tojson }}"""
+    return mark_safe(json.dumps(str(value) if not isinstance(value, (dict, list)) else value))

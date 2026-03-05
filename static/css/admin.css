@@ -741,3 +741,40 @@ table.admin-table tr:hover td { background: var(--bg-hover); }
   .admin-nav { flex-direction: row; overflow-x: auto; }
   .admin-nav a { white-space: nowrap; }
 }
+
+/* ── Client Notes ── */
+.note-card {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.note-card:last-child { border-bottom: none; }
+.note-header {
+  display: flex;
+  align-items: center;
+  gap: .6rem;
+  margin-bottom: .5rem;
+  flex-wrap: wrap;
+}
+.note-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--primary-tint); color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; font-weight: 700; flex-shrink: 0;
+}
+.note-author {
+  font-size: .82rem; font-weight: 600; color: var(--text-head);
+}
+.note-time {
+  margin-left: auto; font-size: .72rem; color: var(--text-faint);
+}
+.note-actions { display: flex; gap: .3rem; }
+.note-body {
+  font-size: .85rem; color: var(--text-body); line-height: 1.6;
+  padding-left: 2.1rem;
+}
+.btn-xs { padding: 2px 7px; font-size: .72rem; }
+
+/* ── Services admin ── */
+.badge-green { background: var(--success-tint); color: var(--success); padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
+.badge-blue  { background: var(--primary-tint); color: var(--primary);  padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600; }
+.badge-grey  { background: var(--bg-hover); color: var(--text-muted); padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600; }

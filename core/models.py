@@ -219,3 +219,64 @@ class Notification(models.Model):
     class Meta:
         db_table = "notifications"
         ordering = ["-created_at"]
+
+
+# ── Client notes ──────────────────────────────────────────────────────────────
+
+class ClientNote(models.Model):
+    user        = models.ForeignKey(TgUser, on_delete=models.CASCADE, related_name="notes")
+    author      = models.ForeignKey(AdminUser, on_delete=models.SET_NULL, null=True, related_name="notes_written")
+    body        = models.TextField()
+    created_at  = models.DateTimeField(default=timezone.now)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "client_notes"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"Note by {self.author_id} on user {self.user_id}"
+
+
+# ── Dynamic services ──────────────────────────────────────────────────────────
+
+class ServiceDefinition(models.Model):
+    slug        = models.SlugField(unique=True)
+    name        = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    ai_prompt   = models.TextField()
+    is_active   = models.BooleanField(default=True)
+    order       = models.IntegerField(default=0)
+    created_at  = models.DateTimeField(default=timezone.now)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "service_definitions"
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class ServiceStep(models.Model):
+    service     = models.ForeignKey(ServiceDefinition, on_delete=models.CASCADE, related_name="steps")
+    label       = models.CharField(max_length=200)
+    description = models.CharField(max_length=500, blank=True)
+    order       = models.IntegerField(default=0)
+
+    class Meta:
+        db_table = "service_steps"
+        ordering = ["order"]
+
+    def __str__(self):
+        return f"{self.service.slug}: {self.label}"
+
+
+class CaseProgress(models.Model):
+    case         = models.OneToOneField(Case, on_delete=models.CASCADE, related_name="progress")
+    current_step = models.ForeignKey(ServiceStep, on_delete=models.SET_NULL, null=True, blank=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+    updated_by   = models.ForeignKey(AdminUser, on_delete=models.SET_NULL, null=True, blank=True)
+
+    class Meta:
+        db_table = "case_progress"

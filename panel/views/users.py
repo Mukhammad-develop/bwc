@@ -13,7 +13,11 @@ from .helpers import (
     session_ctx, is_elevated, can_view_user, get_tg_file_url,
     is_voice_doc, extract_user_profile, call_ai,
 )
-from core.models import TgUser, Case, Document, AdminUser, AdminAssignment, UserAiProfile, PendingSend
+from core.models import (
+    TgUser, Case, Document, AdminUser, AdminAssignment,
+    UserAiProfile, PendingSend, ClientNote,
+    ServiceDefinition, CaseProgress,
+)
 
 
 def _dedupe_conv(conv):
@@ -119,6 +123,29 @@ def user_profile(request, user_db_id):
         ("Urgency",              profile.get("urgency")),
     ]
 
+    # Client notes
+    notes = list(ClientNote.objects.filter(user=user).select_related("author").order_by("-created_at"))
+
+    # Per-case progress data
+    case_progress_data = {}
+    for c in cases:
+        try:
+            sdef  = ServiceDefinition.objects.get(slug=c.service, is_active=True)
+            steps = list(sdef.steps.all())
+        except ServiceDefinition.DoesNotExist:
+            sdef  = None
+            steps = []
+        try:
+            prog = c.progress
+            current_step_id = prog.current_step_id
+        except CaseProgress.DoesNotExist:
+            current_step_id = None
+        current_idx = next((i for i, s in enumerate(steps) if s.pk == current_step_id), -1)
+        case_progress_data[c.pk] = {
+            "sdef": sdef, "steps": steps,
+            "current_step_id": current_step_id, "current_idx": current_idx,
+        }
+
     ctx = session_ctx(request)
     ctx.update({
         "user":                 user,
@@ -134,6 +161,10 @@ def user_profile(request, user_db_id):
         "assignments":          assignments,
         "all_docs_by_unique_id": all_docs_by_uid,
         "all_docs_by_filename": all_docs_by_fname,
+        "notes":                notes,
+        "case_progress_data":   case_progress_data,
+        "current_admin_id":     request.session.get("admin_id"),
+        "current_admin_role":   request.session.get("admin_role"),
     })
     return render(request, "panel/user_profile.html", ctx)
 
@@ -264,3 +295,59 @@ def assign_user(request, user_db_id):
         AdminAssignment.objects.filter(admin_id=admin_id, user=user).delete()
         messages.success(request, "Assignment removed.")
     return redirect(reverse("panel:user_profile", args=[user_db_id]))
+
+
+# ── Client Notes ──────────────────────────────────────────────────────────────
+
+@login_required
+def note_add(request, user_db_id):
+    if request.method != "POST":
+        return redirect(reverse("panel:user_profile", args=[user_db_id]))
+    if not can_view_user(request, user_db_id):
+        messages.error(request, "Access denied.")
+        return redirect(reverse("panel:users"))
+    body = request.POST.get("body", "").strip()
+    if not body:
+        messages.error(request, "Note cannot be empty.")
+        return redirect(reverse("panel:user_profile", args=[user_db_id]))
+    user      = get_object_or_404(TgUser, pk=user_db_id)
+    author_id = request.session.get("admin_id")
+    author    = AdminUser.objects.filter(pk=author_id).first() if author_id else None
+    ClientNote.objects.create(user=user, author=author, body=body)
+    messages.success(request, "Note added.")
+    return redirect(reverse("panel:user_profile", args=[user_db_id]) + "#notes")
+
+
+@login_required
+def note_edit(request, user_db_id, note_id):
+    if request.method != "POST":
+        return redirect(reverse("panel:user_profile", args=[user_db_id]))
+    note = get_object_or_404(ClientNote, pk=note_id, user_id=user_db_id)
+    admin_id = request.session.get("admin_id")
+    role     = request.session.get("admin_role")
+    is_own   = admin_id and note.author_id == admin_id
+    if not is_own and role not in ("master", "admin"):
+        messages.error(request, "You can only edit your own notes.")
+        return redirect(reverse("panel:user_profile", args=[user_db_id]))
+    body = request.POST.get("body", "").strip()
+    if body:
+        note.body = body
+        note.save(update_fields=["body", "updated_at"])
+        messages.success(request, "Note updated.")
+    return redirect(reverse("panel:user_profile", args=[user_db_id]) + "#notes")
+
+
+@login_required
+def note_delete(request, user_db_id, note_id):
+    if request.method != "POST":
+        return redirect(reverse("panel:user_profile", args=[user_db_id]))
+    note = get_object_or_404(ClientNote, pk=note_id, user_id=user_db_id)
+    admin_id = request.session.get("admin_id")
+    role     = request.session.get("admin_role")
+    is_own   = admin_id and note.author_id == admin_id
+    if not is_own and role not in ("master", "admin"):
+        messages.error(request, "You can only delete your own notes.")
+        return redirect(reverse("panel:user_profile", args=[user_db_id]))
+    note.delete()
+    messages.success(request, "Note deleted.")
+    return redirect(reverse("panel:user_profile", args=[user_db_id]) + "#notes")
