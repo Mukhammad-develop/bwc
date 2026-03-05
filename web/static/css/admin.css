@@ -741,3 +741,83 @@ table.admin-table tr:hover td { background: var(--bg-hover); }
   .admin-nav { flex-direction: row; overflow-x: auto; }
   .admin-nav a { white-space: nowrap; }
 }
+
+/* ── Client Notes ──────────────────────────────────────── */
+.note-card {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border, #dde2ea);
+}
+.note-card:last-child { border-bottom: none; }
+.note-header {
+  display: flex; align-items: center; gap: .6rem;
+  margin-bottom: .5rem; flex-wrap: wrap;
+}
+.note-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--primary-tint, #eaf0fe); color: var(--primary, #3b6ef5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: .75rem; font-weight: 700; flex-shrink: 0;
+}
+.note-author { font-size: .82rem; font-weight: 600; color: var(--text-head, #1a2133); }
+.note-time { margin-left: auto; font-size: .72rem; color: var(--text-faint, #9aa5b8); }
+.note-actions { display: flex; gap: .3rem; }
+.note-body {
+  font-size: .85rem; color: var(--text-body, #3a4558);
+  line-height: 1.6; padding-left: 2.1rem;
+}
+.btn-xs { padding: 2px 7px; font-size: .72rem; border-radius: 4px; }
+
+/* ── Progress Bar ──────────────────────────────────────── */
+.progress-bar-wrap {
+  display: flex; align-items: flex-start; gap: 0;
+  padding: .5rem 0; overflow-x: auto;
+}
+.progress-step {
+  display: flex; flex-direction: column; align-items: center;
+  min-width: 80px; flex: 1; gap: 6px; position: relative;
+}
+.progress-line {
+  flex: 1; height: 2px; background: var(--border, #dde2ea);
+  margin-top: 15px; flex-shrink: 0; min-width: 16px;
+}
+.progress-line.completed { background: var(--primary, #3b6ef5); }
+.progress-node {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid var(--border, #dde2ea);
+  background: var(--bg-page, #f4f6f9);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .2s; padding: 0; position: relative; overflow: hidden;
+}
+.progress-node:hover { border-color: var(--primary, #3b6ef5); transform: scale(1.1); }
+.progress-step.completed .progress-node {
+  background: var(--primary, #3b6ef5); border-color: var(--primary, #3b6ef5);
+}
+.progress-step.current .progress-node {
+  background: var(--primary, #3b6ef5); border-color: var(--primary, #3b6ef5);
+  box-shadow: 0 0 0 4px rgba(59,110,245,.2);
+}
+.progress-node-pulse {
+  width: 10px; height: 10px; border-radius: 50%; background: white;
+  animation: pbar-pulse 1.5s ease infinite;
+}
+@keyframes pbar-pulse {
+  0%   { transform: scale(1);   opacity: 1; }
+  70%  { transform: scale(1.4); opacity: .5; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+.progress-label {
+  font-size: .72rem; text-align: center;
+  color: var(--text-muted, #6b7a95); max-width: 80px;
+  line-height: 1.3; word-break: break-word;
+}
+.progress-step.completed .progress-label,
+.progress-step.current   .progress-label {
+  color: var(--text-body, #3a4558); font-weight: 500;
+}
+.progress-desc { font-size: .65rem; color: var(--text-faint, #9aa5b8); text-align: center; max-width: 80px; }
+
+/* ── Services table badge ──────────────────────────────── */
+.badge-count {
+  background: var(--primary-tint, #eaf0fe); color: var(--primary, #3b6ef5);
+  padding: 2px 8px; border-radius: 20px; font-size: .72rem; font-weight: 600;
+}

@@ -1,0 +1,185 @@
+{% extends "admin/base.html" %}
+{% block title %}{% if service %}Edit {{ service.name }}{% else %}Add Service{% endif %}{% endblock %}
+{% block page_title %}{% if service %}Edit Service{% else %}Add Service{% endif %}{% endblock %}
+{% block nav_services %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('admin_services_list') }}" class="btn btn-sm btn-ghost">← Back to Services</a>
+{% endblock %}
+
+{% block content %}
+<form method="post" id="serviceForm">
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">
+
+  <!-- Left: Meta -->
+  <div class="card" style="margin:0">
+    <div class="card-header"><span>Service Info</span></div>
+    <div style="padding:1.25rem;display:flex;flex-direction:column;gap:1rem">
+
+      <div class="form-group">
+        <label class="form-label">Service Name *</label>
+        <input type="text" name="name" class="form-input" required
+               value="{{ service.name if service else '' }}" placeholder="e.g. PAYE Tax Refund"
+               oninput="autoSlug(this.value)">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Slug <small style="color:var(--text-muted,#6b7a95)">(URL identifier)</small></label>
+        <input type="text" name="slug" id="slugField" class="form-input"
+               value="{{ service.slug if service else '' }}" placeholder="e.g. paye"
+               {% if service %}readonly{% endif %}>
+        {% if service %}<div style="font-size:.72rem;color:var(--text-muted,#6b7a95);margin-top:3px">Slug cannot be changed after creation.</div>{% endif %}
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description <small style="color:var(--text-muted,#6b7a95)">(optional)</small></label>
+        <textarea name="description" class="form-input" rows="2" placeholder="Short description...">{{ service.description if service else '' }}</textarea>
+      </div>
+
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:1rem">
+        <div class="form-group" style="margin:0">
+          <label class="form-label">Display Order</label>
+          <input type="number" name="order" class="form-input" value="{{ service.ord if service else 0 }}" min="0">
+        </div>
+        <div class="form-group" style="margin:0;display:flex;flex-direction:column;justify-content:flex-end">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;padding-bottom:8px">
+            <input type="checkbox" name="is_active" {% if not service or service.is_active %}checked{% endif %}>
+            <span class="form-label" style="margin:0">Active</span>
+          </label>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Right: AI Prompt -->
+  <div class="card" style="margin:0">
+    <div class="card-header">
+      <span>AI System Prompt</span>
+      <button type="button" class="btn btn-xs btn-ghost" onclick="resetPrompt()">Reset to template</button>
+    </div>
+    <div style="padding:1rem">
+      <textarea name="ai_prompt" id="aiPromptField" class="form-input" rows="18"
+                style="font-family:monospace;font-size:.8rem;resize:vertical"
+                placeholder="Paste the full GPT system prompt here...">{{ service.ai_prompt if service else '' }}</textarea>
+      <div style="font-size:.72rem;color:var(--text-muted,#6b7a95);margin-top:.35rem">
+        This text becomes the <code>system</code> message for GPT-4o-mini when a client selects this service.
+        A language instruction is automatically appended at runtime.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Progress Steps -->
+<div class="card" style="margin-bottom:1.25rem">
+  <div class="card-header">
+    <span>Progress Steps</span>
+    <small style="color:var(--text-muted,#6b7a95);font-size:.78rem">Define the stages shown on the client progress bar</small>
+  </div>
+  <div style="padding:1.25rem">
+    <div id="stepsList" style="display:flex;flex-direction:column;gap:.6rem;margin-bottom:1rem">
+      {% for step in steps %}
+      <div class="step-row" draggable="true">
+        <span class="drag-handle" title="Drag to reorder">⠿</span>
+        <span class="step-order"></span>
+        <input type="text" name="step_label" class="form-input step-label-input" value="{{ step.label }}" placeholder="Step label *" required style="flex:2">
+        <input type="text" name="step_description" class="form-input" value="{{ step.description }}" placeholder="Description (optional)" style="flex:3">
+        <button type="button" class="btn btn-xs btn-danger" onclick="removeStep(this)">×</button>
+      </div>
+      {% endfor %}
+    </div>
+    <button type="button" class="btn btn-ghost btn-sm" onclick="addStep()">+ Add Step</button>
+    <div style="font-size:.72rem;color:var(--text-muted,#6b7a95);margin-top:.5rem">
+      Steps appear left-to-right on the progress bar. Drag rows to reorder.
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:.75rem;justify-content:flex-end">
+  <a href="{{ url_for('admin_services_list') }}" class="btn btn-ghost">Cancel</a>
+  <button type="submit" class="btn btn-primary">Save Service</button>
+</div>
+
+</form>
+
+<style>
+.step-row {
+  display:flex;align-items:center;gap:.6rem;
+  background:var(--bg-input,#f4f6f9);padding:.45rem .75rem;
+  border-radius:6px;border:1px solid var(--border,#dde2ea);
+}
+.step-row.drag-over { border-color:var(--primary,#3b6ef5); }
+.drag-handle { cursor:grab;color:var(--text-muted,#6b7a95);font-size:1rem;user-select:none;flex-shrink:0; }
+.step-order { color:var(--text-muted,#6b7a95);font-size:.75rem;min-width:20px;text-align:right;flex-shrink:0; }
+.step-label-input { font-weight:500; }
+.btn-xs { padding:2px 7px;font-size:.72rem; }
+.btn-success { background:var(--success,#1c8a4e);color:#fff;border:none; }
+.badge-count { background:var(--primary-tint,#eaf0fe);color:var(--primary,#3b6ef5);padding:2px 8px;border-radius:20px;font-size:.72rem;font-weight:600; }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if not service %}
+function autoSlug(name) {
+  const s = name.toLowerCase().replace(/[^\w\s-]/g,'').replace(/[\s_]+/g,'-').replace(/-+/g,'-').slice(0,50);
+  document.getElementById('slugField').value = s;
+}
+{% else %}
+function autoSlug() {}
+{% endif %}
+
+var DEFAULT_PROMPT = {{ default_prompt | tojson }};
+function resetPrompt() {
+  if (!confirm('Replace the current prompt with the default template?')) return;
+  document.getElementById('aiPromptField').value = DEFAULT_PROMPT;
+}
+
+function reorderSteps() {
+  document.querySelectorAll('.step-order').forEach(function(el, i) { el.textContent = (i+1) + '.'; });
+}
+
+function addStep() {
+  var list = document.getElementById('stepsList');
+  var row = document.createElement('div');
+  row.className = 'step-row';
+  row.draggable = true;
+  row.innerHTML = '<span class="drag-handle" title="Drag to reorder">⠿</span>'
+    + '<span class="step-order"></span>'
+    + '<input type="text" name="step_label" class="form-input step-label-input" placeholder="Step label *" required style="flex:2">'
+    + '<input type="text" name="step_description" class="form-input" placeholder="Description (optional)" style="flex:3">'
+    + '<button type="button" class="btn btn-xs btn-danger" onclick="removeStep(this)">×</button>';
+  bindDrag(row);
+  list.appendChild(row);
+  reorderSteps();
+  row.querySelector('input[name="step_label"]').focus();
+}
+
+function removeStep(btn) {
+  btn.closest('.step-row').remove();
+  reorderSteps();
+}
+
+var dragSrc = null;
+function bindDrag(row) {
+  row.addEventListener('dragstart', function(e) { dragSrc = e.currentTarget; e.dataTransfer.effectAllowed='move'; });
+  row.addEventListener('dragover',  function(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); });
+  row.addEventListener('dragleave', function(e) { e.currentTarget.classList.remove('drag-over'); });
+  row.addEventListener('drop',      function(e) {
+    e.preventDefault();
+    document.querySelectorAll('.step-row').forEach(function(r){ r.classList.remove('drag-over'); });
+    if (!dragSrc || dragSrc === e.currentTarget) return;
+    var rows = Array.from(document.getElementById('stepsList').querySelectorAll('.step-row'));
+    var si = rows.indexOf(dragSrc), ti = rows.indexOf(e.currentTarget);
+    if (si < ti) e.currentTarget.after(dragSrc); else e.currentTarget.before(dragSrc);
+    reorderSteps();
+  });
+}
+
+document.querySelectorAll('.step-row').forEach(bindDrag);
+document.addEventListener('DOMContentLoaded', reorderSteps);
+</script>
+{% endblock %}

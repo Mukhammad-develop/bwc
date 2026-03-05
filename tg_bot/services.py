@@ -299,16 +299,42 @@ Always move the conversation forward naturally."""
 
 
 def build_system_prompt(service: str, lang: str) -> str:
-    if service == "general" or service not in SERVICE_INFO:
-        return GENERAL_SYSTEM_PROMPT
-
-    info = SERVICE_INFO[service]
     lang_map = {
         "en": "English",
         "uz": "Uzbek (Latin script, not Cyrillic)",
         "ru": "Russian",
     }
     reply_lang = lang_map.get(lang, "English")
+    lang_suffix = (
+        f"\n\nLANGUAGE: Reply ONLY in {reply_lang}. "
+        "Never switch languages even if the user writes in a different one.\n"
+        "Keep each message short and focused — one question, one instruction, or one confirmation at a time."
+    )
+
+    # ── 1. Try DB-defined prompt (live-editable from admin panel) ──
+    if service and service != "general":
+        try:
+            import sqlite3 as _sql
+            _db_path = os.getenv("DB_PATH", "")
+            if not _db_path or not _db_path.startswith("/"):
+                _db_path = str(Path(__file__).resolve().parent / "bot.db")
+            _conn = _sql.connect(_db_path)
+            _conn.row_factory = _sql.Row
+            row = _conn.execute(
+                "SELECT ai_prompt FROM service_definitions WHERE slug=? AND is_active=1",
+                (service,),
+            ).fetchone()
+            _conn.close()
+            if row and row["ai_prompt"].strip():
+                return row["ai_prompt"].strip() + lang_suffix
+        except Exception:
+            pass
+
+    # ── 2. Fallback to hardcoded SERVICE_INFO ──
+    if service == "general" or service not in SERVICE_INFO:
+        return GENERAL_SYSTEM_PROMPT
+
+    info = SERVICE_INFO[service]
 
     if "flow" in info:
         return f"""You work at Brightway Consulting, a UK firm helping Central Asian workers in England.

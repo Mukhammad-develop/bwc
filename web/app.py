@@ -886,10 +886,14 @@ def admin_cases():
     query += " ORDER BY c.created_at DESC"
 
     with get_db() as conn:
-        cases = conn.execute(query, params).fetchall()
+        cases        = conn.execute(query, params).fetchall()
+        all_services = conn.execute(
+            "SELECT slug, name FROM service_definitions WHERE is_active=1 ORDER BY ord, name"
+        ).fetchall()
     return render_template("admin/cases.html", cases=cases,
         filter_service=service, filter_status=status, filter_payment=payment,
-        is_master=is_master, is_elevated=elevated)
+        is_master=is_master, is_elevated=elevated,
+        all_services=all_services)
 
 
 @app.route("/admin/cases/<int:case_id>")
@@ -930,13 +934,29 @@ def admin_case_detail(case_id):
                 docs_by_filename[fname] = entry
         docs_for_files = [e for e in docs_with_url if not _is_voice_doc(e["doc"])]
 
+        # Progress bar data for this case
+        svc_row = conn.execute(
+            "SELECT * FROM service_definitions WHERE slug=? AND is_active=1", (case["service"],)
+        ).fetchone()
+        steps = []
+        if svc_row:
+            steps = conn.execute(
+                "SELECT * FROM service_steps WHERE service_id=? ORDER BY ord", (svc_row["id"],)
+            ).fetchall()
+        prog = conn.execute("SELECT * FROM case_progress WHERE case_id=?", (case_id,)).fetchone()
+        current_step_id = prog["step_id"] if prog else None
+        current_idx = next((i for i, s in enumerate(steps) if s["id"] == current_step_id), -1)
+
     return render_template("admin/case_detail.html",
         case=case, conversation=conversation,
         docs_with_url=docs_with_url,
         docs_for_files=docs_for_files,
         docs_by_unique_id=docs_by_unique_id,
         docs_by_filename=docs_by_filename,
-        is_master=session.get("admin_role")=="master")
+        is_master=session.get("admin_role")=="master",
+        steps=[dict(s) for s in steps],
+        current_step_id=current_step_id,
+        current_idx=current_idx)
 
 
 @app.route("/admin/cases/<int:case_id>/update", methods=["POST"])
@@ -1214,6 +1234,35 @@ def admin_user_profile(user_db_id):
             all_docs_by_filename[fname] = entry
     docs_for_files = [e for e in docs_with_url if not _is_voice_doc(e["doc"])]
 
+    with get_db() as conn:
+        notes = conn.execute("""
+            SELECT n.*, a.username, a.display_name, a.role as author_role
+            FROM client_notes n
+            LEFT JOIN admin_users a ON n.author_id = a.id
+            WHERE n.user_id = ? ORDER BY n.created_at DESC
+        """, (user_db_id,)).fetchall()
+
+        # Per-case progress data
+        case_progress_data = {}
+        for c in cases:
+            svc_row = conn.execute(
+                "SELECT * FROM service_definitions WHERE slug=? AND is_active=1", (c["service"],)
+            ).fetchone()
+            steps = []
+            if svc_row:
+                steps = conn.execute(
+                    "SELECT * FROM service_steps WHERE service_id=? ORDER BY ord", (svc_row["id"],)
+                ).fetchall()
+            prog = conn.execute(
+                "SELECT * FROM case_progress WHERE case_id=?", (c["id"],)
+            ).fetchone()
+            current_step_id = prog["step_id"] if prog else None
+            current_idx = next((i for i, s in enumerate(steps) if s["id"] == current_step_id), -1)
+            case_progress_data[c["id"]] = {
+                "svc": svc_row, "steps": [dict(s) for s in steps],
+                "current_step_id": current_step_id, "current_idx": current_idx,
+            }
+
     return render_template("admin/user_profile.html",
         user=user, cases=cases, docs_with_url=docs_with_url,
         docs_for_files=docs_for_files,
@@ -1222,7 +1271,11 @@ def admin_user_profile(user_db_id):
         is_elevated=is_elevated(),
         all_admins=all_admins, assignments=assignments,
         all_docs_by_unique_id=all_docs_by_unique_id,
-        all_docs_by_filename=all_docs_by_filename)
+        all_docs_by_filename=all_docs_by_filename,
+        notes=notes,
+        case_progress_data=case_progress_data,
+        current_admin_id=session.get("admin_id"),
+        current_admin_role=session.get("admin_role"))
 
 
 @app.route("/admin/users/<int:user_db_id>/send", methods=["POST"])
@@ -1514,6 +1567,279 @@ def admin_import_status(req_id):
     if not row:
         return jsonify({"error": "Not found"}), 404
     return jsonify(dict(row))
+
+
+# ─────────────────────────── CLIENT NOTES ─────────────────────────
+
+@app.route("/admin/users/<int:user_db_id>/notes/add", methods=["POST"])
+@login_required
+def admin_note_add(user_db_id):
+    if not can_view_user(user_db_id):
+        flash("Access denied.", "error")
+        return redirect(url_for("admin_users"))
+    body = request.form.get("body", "").strip()
+    if not body:
+        flash("Note cannot be empty.", "error")
+        return redirect(url_for("admin_user_profile", user_db_id=user_db_id) + "#notes")
+    author_id = session.get("admin_id")
+    now = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        conn.execute(
+            "INSERT INTO client_notes (user_id, author_id, body, created_at, updated_at) VALUES (?,?,?,?,?)",
+            (user_db_id, author_id, body, now, now),
+        )
+        conn.commit()
+    flash("Note added.", "success")
+    return redirect(url_for("admin_user_profile", user_db_id=user_db_id) + "#notes")
+
+
+@app.route("/admin/users/<int:user_db_id>/notes/<int:note_id>/edit", methods=["POST"])
+@login_required
+def admin_note_edit(user_db_id, note_id):
+    with get_db() as conn:
+        note = conn.execute("SELECT * FROM client_notes WHERE id=?", (note_id,)).fetchone()
+        if not note or note["user_id"] != user_db_id:
+            flash("Note not found.", "error")
+            return redirect(url_for("admin_user_profile", user_db_id=user_db_id))
+        admin_id = session.get("admin_id")
+        role     = session.get("admin_role")
+        is_own   = admin_id and note["author_id"] == admin_id
+        if not is_own and role not in ("master", "admin"):
+            flash("You can only edit your own notes.", "error")
+            return redirect(url_for("admin_user_profile", user_db_id=user_db_id))
+        body = request.form.get("body", "").strip()
+        if body:
+            conn.execute(
+                "UPDATE client_notes SET body=?, updated_at=? WHERE id=?",
+                (body, datetime.utcnow().isoformat(), note_id),
+            )
+            conn.commit()
+            flash("Note updated.", "success")
+    return redirect(url_for("admin_user_profile", user_db_id=user_db_id) + "#notes")
+
+
+@app.route("/admin/users/<int:user_db_id>/notes/<int:note_id>/delete", methods=["POST"])
+@login_required
+def admin_note_delete(user_db_id, note_id):
+    with get_db() as conn:
+        note = conn.execute("SELECT * FROM client_notes WHERE id=?", (note_id,)).fetchone()
+        if not note or note["user_id"] != user_db_id:
+            flash("Note not found.", "error")
+            return redirect(url_for("admin_user_profile", user_db_id=user_db_id))
+        admin_id = session.get("admin_id")
+        role     = session.get("admin_role")
+        is_own   = admin_id and note["author_id"] == admin_id
+        if not is_own and role not in ("master", "admin"):
+            flash("You can only delete your own notes.", "error")
+            return redirect(url_for("admin_user_profile", user_db_id=user_db_id))
+        conn.execute("DELETE FROM client_notes WHERE id=?", (note_id,))
+        conn.commit()
+    flash("Note deleted.", "success")
+    return redirect(url_for("admin_user_profile", user_db_id=user_db_id) + "#notes")
+
+
+# ─────────────────────────── CASE PROGRESS ────────────────────────
+
+@app.route("/admin/cases/<int:case_id>/progress", methods=["POST"])
+@login_required
+def admin_case_progress(case_id):
+    with get_db() as conn:
+        case = conn.execute("SELECT user_id FROM cases WHERE id=?", (case_id,)).fetchone()
+        if not case or not can_view_user(case["user_id"]):
+            flash("Access denied.", "error")
+            return redirect(url_for("admin_cases"))
+        step_id  = request.form.get("step_id", type=int)
+        admin_id = session.get("admin_id")
+        now = datetime.utcnow().isoformat()
+        existing = conn.execute("SELECT id FROM case_progress WHERE case_id=?", (case_id,)).fetchone()
+        if step_id:
+            step = conn.execute("SELECT label FROM service_steps WHERE id=?", (step_id,)).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE case_progress SET step_id=?, updated_at=?, updated_by_id=? WHERE case_id=?",
+                    (step_id, now, admin_id, case_id),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO case_progress (case_id, step_id, updated_at, updated_by_id) VALUES (?,?,?,?)",
+                    (case_id, step_id, now, admin_id),
+                )
+            conn.commit()
+            flash(f"Progress updated to: {step['label'] if step else step_id}", "success")
+        else:
+            conn.execute("DELETE FROM case_progress WHERE case_id=?", (case_id,))
+            conn.commit()
+            flash("Progress cleared.", "success")
+    return redirect(url_for("admin_case_detail", case_id=case_id))
+
+
+# ─────────────────────────── SERVICES MANAGEMENT ──────────────────
+
+def _slugify(text):
+    import re
+    text = text.lower().strip()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[\s_]+", "-", text)
+    return re.sub(r"-+", "-", text)[:50]
+
+
+@app.route("/admin/services")
+@elevated_required
+def admin_services_list():
+    with get_db() as conn:
+        services = conn.execute(
+            "SELECT * FROM service_definitions ORDER BY ord, name"
+        ).fetchall()
+        services_with_steps = []
+        for svc in services:
+            cnt = conn.execute(
+                "SELECT COUNT(*) as c FROM service_steps WHERE service_id=?", (svc["id"],)
+            ).fetchone()["c"]
+            services_with_steps.append({"svc": svc, "step_count": cnt})
+    return render_template("admin/services_admin.html",
+        services=services_with_steps,
+        is_master=session.get("admin_role") == "master",
+        is_elevated=is_elevated())
+
+
+@app.route("/admin/services/add", methods=["GET", "POST"])
+@master_required
+def admin_service_add():
+    if request.method == "POST":
+        name        = request.form.get("name", "").strip()
+        slug        = request.form.get("slug", "").strip() or _slugify(name)
+        description = request.form.get("description", "").strip()
+        ai_prompt   = request.form.get("ai_prompt", "").strip()
+        is_active   = request.form.get("is_active") == "on"
+        order       = int(request.form.get("order", 0) or 0)
+
+        if not name:
+            flash("Service name is required.", "error")
+        else:
+            now = datetime.utcnow().isoformat()
+            with get_db() as conn:
+                try:
+                    conn.execute(
+                        "INSERT INTO service_definitions (slug, name, description, ai_prompt, is_active, ord, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+                        (slug, name, description, ai_prompt, 1 if is_active else 0, order, now, now),
+                    )
+                    conn.commit()
+                    svc_id = conn.execute("SELECT id FROM service_definitions WHERE slug=?", (slug,)).fetchone()["id"]
+                    _save_steps_from_form(conn, svc_id)
+                    flash(f"Service '{name}' created.", "success")
+                    return redirect(url_for("admin_services_list"))
+                except sqlite3.IntegrityError:
+                    flash(f"A service with slug '{slug}' already exists.", "error")
+
+    return render_template("admin/service_edit.html",
+        service=None, steps=[],
+        is_master=True,
+        default_prompt=_default_service_prompt())
+
+
+@app.route("/admin/services/<slug>/edit", methods=["GET", "POST"])
+@elevated_required
+def admin_service_edit(slug):
+    with get_db() as conn:
+        svc = conn.execute("SELECT * FROM service_definitions WHERE slug=?", (slug,)).fetchone()
+        if not svc:
+            flash("Service not found.", "error")
+            return redirect(url_for("admin_services_list"))
+
+        if request.method == "POST":
+            name        = request.form.get("name", "").strip()
+            description = request.form.get("description", "").strip()
+            ai_prompt   = request.form.get("ai_prompt", "").strip()
+            is_active   = request.form.get("is_active") == "on"
+            order       = int(request.form.get("order", 0) or 0)
+            if not name:
+                flash("Service name is required.", "error")
+            else:
+                now = datetime.utcnow().isoformat()
+                conn.execute(
+                    "UPDATE service_definitions SET name=?, description=?, ai_prompt=?, is_active=?, ord=?, updated_at=? WHERE slug=?",
+                    (name, description, ai_prompt, 1 if is_active else 0, order, now, slug),
+                )
+                conn.commit()
+                _save_steps_from_form(conn, svc["id"])
+                flash(f"Service '{name}' saved.", "success")
+                return redirect(url_for("admin_services_list"))
+
+        steps = conn.execute(
+            "SELECT * FROM service_steps WHERE service_id=? ORDER BY ord", (svc["id"],)
+        ).fetchall()
+
+    return render_template("admin/service_edit.html",
+        service=svc, steps=steps,
+        is_master=session.get("admin_role") == "master",
+        default_prompt=_default_service_prompt())
+
+
+@app.route("/admin/services/<slug>/delete", methods=["POST"])
+@master_required
+def admin_service_delete(slug):
+    with get_db() as conn:
+        svc = conn.execute("SELECT id, name FROM service_definitions WHERE slug=?", (slug,)).fetchone()
+        if svc:
+            conn.execute("DELETE FROM service_steps WHERE service_id=?", (svc["id"],))
+            conn.execute("DELETE FROM service_definitions WHERE slug=?", (slug,))
+            conn.commit()
+            flash(f"Service '{svc['name']}' deleted.", "success")
+    return redirect(url_for("admin_services_list"))
+
+
+@app.route("/admin/services/<slug>/toggle", methods=["POST"])
+@elevated_required
+def admin_service_toggle(slug):
+    with get_db() as conn:
+        conn.execute(
+            "UPDATE service_definitions SET is_active=CASE WHEN is_active=1 THEN 0 ELSE 1 END, updated_at=? WHERE slug=?",
+            (datetime.utcnow().isoformat(), slug),
+        )
+        conn.commit()
+    return redirect(url_for("admin_services_list"))
+
+
+def _save_steps_from_form(conn, service_id):
+    """Parse step_label[] / step_description[] from current request form and rebuild steps."""
+    labels = request.form.getlist("step_label")
+    descs  = request.form.getlist("step_description")
+    conn.execute("DELETE FROM service_steps WHERE service_id=?", (service_id,))
+    for i, label in enumerate(labels):
+        label = label.strip()
+        if not label:
+            continue
+        desc = descs[i].strip() if i < len(descs) else ""
+        conn.execute(
+            "INSERT INTO service_steps (service_id, label, description, ord) VALUES (?,?,?,?)",
+            (service_id, label, desc, i),
+        )
+    conn.commit()
+
+
+def _default_service_prompt():
+    return """You work at Brightway Consulting, a UK firm.
+You are chatting with a client on Telegram about [SERVICE NAME].
+
+YOUR JOB — gather this info through natural conversation, one thing at a time:
+- [item 1]
+- [item 2]
+
+DOCUMENTS you'll need from them (ask when the moment feels right, not all at once):
+- [document 1]
+
+Once docs are uploaded: tell them the team will review and send payment info + next steps within 24-48h.
+If they ask price: say the team confirms the exact fee after reviewing — it's competitive for what's included.
+
+TONE AND STYLE:
+- Sound like a real consultant in a live chat, not a scripted assistant.
+- Professional, warm, and direct.
+- Ask exactly ONE clear question per message.
+- Keep replies short (1-3 short sentences) unless sharing a document list.
+
+AVOID BOT-LIKE PHRASES: "Thank you for your message." / "Kindly provide..."
+
+LANGUAGE: Reply in the user's language. Keep messages short and focused."""
 
 
 # ─────────────────────────── MAIN ─────────────────────────────────

@@ -1,0 +1,38 @@
+{#
+  Reusable progress bar partial.
+  Required context vars (set with {% set %} before {% include %}):
+    steps           - list of step dicts (id, label, description, ord)
+    current_idx     - int, index of current step (-1 = none)
+    current_step_id - int or None
+    prog_case_id    - int, case.id for the progress form action
+#}
+<div class="progress-bar-wrap">
+  {% for step in steps %}
+  {% set step_idx = loop.index0 %}
+  <div class="progress-step {% if step_idx < current_idx %}completed{% elif step_idx == current_idx %}current{% else %}pending{% endif %}">
+    <form method="POST" action="{{ url_for('admin_case_progress', case_id=prog_case_id) }}" style="display:contents">
+      <input type="hidden" name="step_id" value="{{ step.id }}">
+      <button type="submit" class="progress-node" title="Set to: {{ step.label }}">
+        {% if step_idx < current_idx %}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        {% elif step_idx == current_idx %}
+        <div class="progress-node-pulse"></div>
+        {% endif %}
+      </button>
+    </form>
+    <div class="progress-label">{{ step.label }}</div>
+    {% if step.description %}<div class="progress-desc">{{ step.description }}</div>{% endif %}
+  </div>
+  {% if not loop.last %}
+  <div class="progress-line {% if step_idx < current_idx %}completed{% endif %}"></div>
+  {% endif %}
+  {% endfor %}
+</div>
+{% if current_idx >= 0 %}
+<div style="text-align:center;margin-top:.75rem;font-size:.8rem;color:var(--text-muted,#6b7a95)">
+  Step {{ current_idx + 1 }} of {{ steps|length }}:
+  <strong style="color:var(--text-body,#3a4558)">
+    {% for s in steps %}{% if loop.index0 == current_idx %}{{ s.label }}{% endif %}{% endfor %}
+  </strong>
+</div>
+{% endif %}

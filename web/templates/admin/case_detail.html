@@ -176,6 +176,16 @@
   <!-- Right panel: case info + update -->
   <div style="display:flex;flex-direction:column;gap:16px">
 
+    {% if steps %}
+    <div class="card">
+      <div class="card-header"><h3>Service Progress</h3></div>
+      <div style="padding:1.25rem 1rem">
+        {% set prog_case_id = case.id %}
+        {% include "admin/_progress_bar.html" %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Case details -->
     <div class="card">
       <div class="card-header"><h3>Case Info</h3></div>

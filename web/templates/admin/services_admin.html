@@ -1,0 +1,75 @@
+{% extends "admin/base.html" %}
+{% block title %}Services{% endblock %}
+{% block page_title %}Services{% endblock %}
+{% block nav_services %}active{% endblock %}
+
+{% block topbar_actions %}
+{% if is_master %}
+<a href="{{ url_for('admin_service_add') }}" class="btn btn-sm btn-primary">+ Add Service</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <span>All Services ({{ services|length }})</span>
+    <small style="color:var(--text-muted,#6b7a95);font-size:.78rem">Define services, AI prompts, and progress steps</small>
+  </div>
+
+  {% if not services %}
+  <div style="padding:2.5rem;text-align:center;color:var(--text-muted,#6b7a95)">
+    <p>No services defined yet.</p>
+    {% if is_master %}
+    <a href="{{ url_for('admin_service_add') }}" class="btn btn-primary" style="margin-top:.75rem">Add your first service</a>
+    {% endif %}
+  </div>
+  {% else %}
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Slug</th>
+        <th style="text-align:center">Active</th>
+        <th style="text-align:center">Steps</th>
+        <th>Updated</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in services %}
+      {% set svc = item.svc %}
+      <tr>
+        <td>
+          <strong>{{ svc.name }}</strong>
+          {% if svc.description %}<div style="font-size:.75rem;color:var(--text-muted,#6b7a95);margin-top:2px">{{ svc.description[:60] }}</div>{% endif %}
+        </td>
+        <td><code style="background:var(--bg-input,#f4f6f9);padding:2px 6px;border-radius:4px;font-size:.78rem">{{ svc.slug }}</code></td>
+        <td style="text-align:center">
+          <form method="post" action="{{ url_for('admin_service_toggle', slug=svc.slug) }}" style="display:inline">
+            <button type="submit" class="btn btn-xs {% if svc.is_active %}btn-success{% else %}btn-ghost{% endif %}">
+              {% if svc.is_active %}Active{% else %}Inactive{% endif %}
+            </button>
+          </form>
+        </td>
+        <td style="text-align:center">
+          <span class="badge-count">{{ item.step_count }} step{{ item.step_count != 1 and 's' or '' }}</span>
+        </td>
+        <td style="color:var(--text-muted,#6b7a95);font-size:.8rem">{{ svc.updated_at[:10] }}</td>
+        <td style="text-align:right;white-space:nowrap">
+          {% if is_elevated %}
+          <a href="{{ url_for('admin_service_edit', slug=svc.slug) }}" class="btn btn-xs btn-ghost">Edit</a>
+          {% endif %}
+          {% if is_master %}
+          <form method="post" action="{{ url_for('admin_service_delete', slug=svc.slug) }}" style="display:inline"
+                onsubmit="return confirm('Delete service \'{{ svc.name }}\'? This cannot be undone.')">
+            <button type="submit" class="btn btn-xs btn-danger">Delete</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endblock %}

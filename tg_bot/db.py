@@ -5,6 +5,49 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS client_notes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    author_id  INTEGER,
+    body       TEXT    NOT NULL,
+    created_at TEXT    NOT NULL,
+    updated_at TEXT    NOT NULL,
+    FOREIGN KEY(user_id)   REFERENCES users(id),
+    FOREIGN KEY(author_id) REFERENCES admin_users(id)
+);
+
+CREATE TABLE IF NOT EXISTS service_definitions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug        TEXT    UNIQUE NOT NULL,
+    name        TEXT    NOT NULL,
+    description TEXT    DEFAULT '',
+    ai_prompt   TEXT    DEFAULT '',
+    is_active   INTEGER DEFAULT 1,
+    ord         INTEGER DEFAULT 0,
+    created_at  TEXT    NOT NULL,
+    updated_at  TEXT    NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS service_steps (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    service_id  INTEGER NOT NULL,
+    label       TEXT    NOT NULL,
+    description TEXT    DEFAULT '',
+    ord         INTEGER DEFAULT 0,
+    FOREIGN KEY(service_id) REFERENCES service_definitions(id)
+);
+
+CREATE TABLE IF NOT EXISTS case_progress (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    case_id         INTEGER UNIQUE NOT NULL,
+    step_id         INTEGER,
+    updated_at      TEXT    NOT NULL,
+    updated_by_id   INTEGER,
+    FOREIGN KEY(case_id)       REFERENCES cases(id),
+    FOREIGN KEY(step_id)       REFERENCES service_steps(id),
+    FOREIGN KEY(updated_by_id) REFERENCES admin_users(id)
+);
+
 CREATE TABLE IF NOT EXISTS import_requests (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     user_tg_id    TEXT    NOT NULL,
@@ -154,6 +197,187 @@ def init_db(db_path: str) -> None:
             conn.commit()
         except sqlite3.OperationalError:
             pass
+        # New tables (idempotent CREATE IF NOT EXISTS already in SCHEMA)
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS client_notes (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id    INTEGER NOT NULL,
+                author_id  INTEGER,
+                body       TEXT    NOT NULL,
+                created_at TEXT    NOT NULL,
+                updated_at TEXT    NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS service_definitions (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                slug        TEXT    UNIQUE NOT NULL,
+                name        TEXT    NOT NULL,
+                description TEXT    DEFAULT '',
+                ai_prompt   TEXT    DEFAULT '',
+                is_active   INTEGER DEFAULT 1,
+                ord         INTEGER DEFAULT 0,
+                created_at  TEXT    NOT NULL,
+                updated_at  TEXT    NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS service_steps (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                service_id  INTEGER NOT NULL,
+                label       TEXT    NOT NULL,
+                description TEXT    DEFAULT '',
+                ord         INTEGER DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS case_progress (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                case_id       INTEGER UNIQUE NOT NULL,
+                step_id       INTEGER,
+                updated_at    TEXT    NOT NULL,
+                updated_by_id INTEGER
+            );
+        """)
+        conn.commit()
+
+
+# ── Client Notes ──────────────────────────────────────────────────────────────
+
+def add_client_note(conn: sqlite3.Connection, user_id: int, author_id: Optional[int], body: str) -> int:
+    now = _now_iso()
+    cur = conn.execute(
+        "INSERT INTO client_notes (user_id, author_id, body, created_at, updated_at) VALUES (?,?,?,?,?)",
+        (user_id, author_id, body, now, now),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def get_client_notes(conn: sqlite3.Connection, user_id: int) -> List[sqlite3.Row]:
+    return conn.execute("""
+        SELECT n.*, a.username, a.display_name, a.role as author_role
+        FROM client_notes n
+        LEFT JOIN admin_users a ON n.author_id = a.id
+        WHERE n.user_id = ? ORDER BY n.created_at DESC
+    """, (user_id,)).fetchall()
+
+
+def update_client_note(conn: sqlite3.Connection, note_id: int, body: str) -> None:
+    conn.execute(
+        "UPDATE client_notes SET body=?, updated_at=? WHERE id=?",
+        (body, _now_iso(), note_id),
+    )
+    conn.commit()
+
+
+def delete_client_note(conn: sqlite3.Connection, note_id: int) -> None:
+    conn.execute("DELETE FROM client_notes WHERE id=?", (note_id,))
+    conn.commit()
+
+
+def get_note(conn: sqlite3.Connection, note_id: int) -> Optional[sqlite3.Row]:
+    return conn.execute("SELECT * FROM client_notes WHERE id=?", (note_id,)).fetchone()
+
+
+# ── Service Definitions ───────────────────────────────────────────────────────
+
+def get_all_services(conn: sqlite3.Connection, active_only: bool = False) -> List[sqlite3.Row]:
+    sql = "SELECT * FROM service_definitions"
+    if active_only:
+        sql += " WHERE is_active=1"
+    sql += " ORDER BY ord, name"
+    return conn.execute(sql).fetchall()
+
+
+def get_service_by_slug(conn: sqlite3.Connection, slug: str) -> Optional[sqlite3.Row]:
+    return conn.execute("SELECT * FROM service_definitions WHERE slug=?", (slug,)).fetchone()
+
+
+def create_service(conn: sqlite3.Connection, slug: str, name: str, description: str,
+                   ai_prompt: str, is_active: bool = True, order: int = 0) -> int:
+    now = _now_iso()
+    cur = conn.execute(
+        "INSERT INTO service_definitions (slug, name, description, ai_prompt, is_active, ord, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)",
+        (slug, name, description, ai_prompt, 1 if is_active else 0, order, now, now),
+    )
+    conn.commit()
+    return cur.lastrowid
+
+
+def update_service(conn: sqlite3.Connection, slug: str, name: str, description: str,
+                   ai_prompt: str, is_active: bool, order: int) -> None:
+    conn.execute(
+        "UPDATE service_definitions SET name=?, description=?, ai_prompt=?, is_active=?, ord=?, updated_at=? WHERE slug=?",
+        (name, description, ai_prompt, 1 if is_active else 0, order, _now_iso(), slug),
+    )
+    conn.commit()
+
+
+def toggle_service(conn: sqlite3.Connection, slug: str) -> None:
+    conn.execute(
+        "UPDATE service_definitions SET is_active = CASE WHEN is_active=1 THEN 0 ELSE 1 END, updated_at=? WHERE slug=?",
+        (_now_iso(), slug),
+    )
+    conn.commit()
+
+
+def delete_service(conn: sqlite3.Connection, slug: str) -> None:
+    row = conn.execute("SELECT id FROM service_definitions WHERE slug=?", (slug,)).fetchone()
+    if row:
+        conn.execute("DELETE FROM service_steps WHERE service_id=?", (row["id"],))
+        conn.execute("DELETE FROM service_definitions WHERE slug=?", (slug,))
+        conn.commit()
+
+
+# ── Service Steps ─────────────────────────────────────────────────────────────
+
+def get_steps_for_service(conn: sqlite3.Connection, service_slug: str) -> List[sqlite3.Row]:
+    row = conn.execute("SELECT id FROM service_definitions WHERE slug=?", (service_slug,)).fetchone()
+    if not row:
+        return []
+    return conn.execute(
+        "SELECT * FROM service_steps WHERE service_id=? ORDER BY ord", (row["id"],)
+    ).fetchall()
+
+
+def replace_steps(conn: sqlite3.Connection, service_slug: str, steps: List[Dict[str, Any]]) -> None:
+    """Delete all existing steps for a service and insert the new ordered list."""
+    row = conn.execute("SELECT id FROM service_definitions WHERE slug=?", (service_slug,)).fetchone()
+    if not row:
+        return
+    service_id = row["id"]
+    conn.execute("DELETE FROM service_steps WHERE service_id=?", (service_id,))
+    for i, s in enumerate(steps):
+        label = (s.get("label") or "").strip()
+        if not label:
+            continue
+        conn.execute(
+            "INSERT INTO service_steps (service_id, label, description, ord) VALUES (?,?,?,?)",
+            (service_id, label, (s.get("description") or "").strip(), i),
+        )
+    conn.commit()
+
+
+def get_step(conn: sqlite3.Connection, step_id: int) -> Optional[sqlite3.Row]:
+    return conn.execute("SELECT * FROM service_steps WHERE id=?", (step_id,)).fetchone()
+
+
+# ── Case Progress ─────────────────────────────────────────────────────────────
+
+def get_case_progress(conn: sqlite3.Connection, case_id: int) -> Optional[sqlite3.Row]:
+    return conn.execute("SELECT * FROM case_progress WHERE case_id=?", (case_id,)).fetchone()
+
+
+def set_case_progress(conn: sqlite3.Connection, case_id: int,
+                      step_id: Optional[int], updated_by_id: Optional[int]) -> None:
+    existing = conn.execute("SELECT id FROM case_progress WHERE case_id=?", (case_id,)).fetchone()
+    now = _now_iso()
+    if existing:
+        conn.execute(
+            "UPDATE case_progress SET step_id=?, updated_at=?, updated_by_id=? WHERE case_id=?",
+            (step_id, now, updated_by_id, case_id),
+        )
+    else:
+        conn.execute(
+            "INSERT INTO case_progress (case_id, step_id, updated_at, updated_by_id) VALUES (?,?,?,?)",
+            (case_id, step_id, now, updated_by_id),
+        )
+    conn.commit()
 
 
 def get_or_create_user(conn: sqlite3.Connection, tg_id: int) -> int:
