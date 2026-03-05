@@ -140,6 +140,43 @@ def init_admin_tables():
             conn.commit()
         except sqlite3.OperationalError:
             pass
+        # New tables added for client notes, services management, and progress tracking
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS client_notes (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id    INTEGER NOT NULL,
+            author_id  INTEGER,
+            body       TEXT    NOT NULL,
+            created_at TEXT    NOT NULL,
+            updated_at TEXT    NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS service_definitions (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            slug        TEXT    UNIQUE NOT NULL,
+            name        TEXT    NOT NULL,
+            description TEXT    DEFAULT '',
+            ai_prompt   TEXT    DEFAULT '',
+            is_active   INTEGER DEFAULT 1,
+            ord         INTEGER DEFAULT 0,
+            created_at  TEXT    NOT NULL,
+            updated_at  TEXT    NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS service_steps (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            service_id  INTEGER NOT NULL,
+            label       TEXT    NOT NULL,
+            description TEXT    DEFAULT '',
+            ord         INTEGER DEFAULT 0
+        );
+        CREATE TABLE IF NOT EXISTS case_progress (
+            id            INTEGER PRIMARY KEY AUTOINCREMENT,
+            case_id       INTEGER UNIQUE NOT NULL,
+            step_id       INTEGER,
+            updated_at    TEXT    NOT NULL,
+            updated_by_id INTEGER
+        );
+        """)
+        conn.commit()
 
 
 init_admin_tables()
